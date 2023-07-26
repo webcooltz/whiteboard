@@ -1,0 +1,49 @@
+<!--Page title-->
+<div class="palette__title"><h2>Palette</h2></div>
+<!--Page container-->
+<div class="palette-container">
+  <!--Misc section-->
+  <div class="palette-container">
+    <button class="palette__button"
+      (click)="clearCanvas()">
+      Clear <i class="fas fa-soap"></i>
+    </button>
+    <div class="brush__size__container">
+      <label class="brush__size__label">Brush Size</label>
+      <input class="brush__size__input"
+        type="number"
+        min="1"
+        max="100"
+        [(ngModel)]="palette.userSelections.brushSize"
+        (ngModelChange)="updateBrushSize($event)">
+    </div>
+  </div>
+  <!--Color section-->
+  <div class="palette__box">
+    <!--Color outline-->
+    <div class="palette__outline"
+      *ngFor="let color of palette.colors"
+      [ngStyle]="{'border': color === palette.userSelections.color ? '2px solid blue' : 'none'}">
+      <!--Color box-->
+      <div class="palette__item"
+        [ngStyle]="{'background-color': color}"
+        (click)="selectColor(color)">
+      </div>
+    </div>
+  </div>
+  <!--Tool section-->
+  <div class="palette__box">
+    <!--tool outline-->
+    <div class="palette__outline"
+      *ngFor="let tool of palette.tools"
+      [ngStyle]="{'border': tool === palette.userSelections.tool ? '2px solid blue' : 'none'}">
+      <!--tool box-->
+      <div class="palette__item"
+        (click)="selectTool(tool)">
+        {{ tool.name }}
+        <i [class]="tool.icon"></i>
+        <!-- <img [src]="tool.icon" [alt]="tool.name"> -->
+      </div>
+    </div>
+  </div>
+</div>

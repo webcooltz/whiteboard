@@ -1,0 +1,23 @@
+.page-container {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+
+app-canvas {
+  border: 5px solid black;
+  background-color: white;
+  width: 100%;
+  height: 100%;
+}
+
+app-palette {
+  border: 5px solid brown;
+  background-color: white;
+  width: 100%;
+  height: 100%;
+}

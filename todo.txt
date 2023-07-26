@@ -1,0 +1,85 @@
+---canvas---
+
+to-do
+-when window is resized, canvas is resized
+  -use window.onresize
+-if eraser is selected, picking another color changes it back to pen
+-make palette smaller
+-make palette boxes smaller
+-bigger, more dynamic, color picker
+
+done
+-eraser
+-pen
+-color picker (basic)
+-tool picker
+-clear button
+-add icons
+-brush size
+
+---minimum viable products---
+
+whiteboard
+-user can draw on canvas
+-canvas is resizable
+-color/tool picker
+  -change brush size and color
+-undo/redo
+-clear
+-eraser
+
+etch-a-sketch
+-whiteboard app
+-user can send a drawing to another user (not live updates)
+  -use express/node.js webserver
+-raspberry pi setup
+-user draws with touch screen, mouse, or touch pad(?) OR another device
+
+---features---
+
+potential ideas
+-when window is scrolled, canvas is scrolled
+-combine with RPI home photobooth idea to send drawings and pictures
+-make a game out of it -- pictionary, line runner, line eater??
+
+color/tool picker
+-when color is selected, color is used in canvas component
+-when tool is selected, tool is used in canvas component
+-separate component
+-service? to communicate with canvas component
+
+other features
+-other colors
+-other brushes
+-shapes
+-undo/redo
+  -Remember to save the state of the canvas before each change?
+  -OR ask ChatGPT
+-clear
+-pan
+-zoom
+  -change canvas size?
+-rotate
+-rectangle
+-circle
+-line
+  -click and click again?
+  -OR click and drag? **preferred**
+  -change event listener? like an if statement for each tool
+    -IF -- have event listeners under each if statement?
+      -example: if (tool === 'line') { canvas.addEventListener('mousedown', drawLine) }
+    -OR -- have if statements under each event listener
+-polygon
+-images and image manipulation
+-text
+-clipart/icons & search
+-background color
+-stamps
+-spraypaint
+
+---design---
+
+change cursor-styles
+  -change cursor to crosshair when tool is selected
+  -change cursor to default when tool is deselected
+  -change cursor to pointer when hovering over tool

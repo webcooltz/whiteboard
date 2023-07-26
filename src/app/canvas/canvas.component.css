@@ -1,0 +1,28 @@
+.canvas-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+canvas {
+  display: block;
+}
+
+#whiteboard {
+    border: 5px solid red;
+    background-color: white;
+    cursor: crosshair;
+    z-index: 1; /* make sure it's on top of other elements */
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+#previewCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
