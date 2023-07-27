@@ -10,8 +10,10 @@ import { Tool } from '../models/tool.model';
   styleUrls: ['./palette.component.css']
 })
 export class PaletteComponent implements OnInit, OnDestroy {
+  // ---Palette setup---
   palette!: Palette;
   paletteChangeSub!: Subscription;
+  // ---other vars---
 
   constructor(private paletteService: PaletteService) { }
 
@@ -30,8 +32,10 @@ export class PaletteComponent implements OnInit, OnDestroy {
     this.paletteChangeSub.unsubscribe();
   }
 
-  selectColor(color: string): void {
-    this.palette.userSelections.color = color;
+  // Handle color changes
+  onColorChange(event: string) {
+    console.log("onColorChange triggered");
+    this.palette.userSelections.color = event;
     this.paletteService.setPalette(this.palette);
   }
 

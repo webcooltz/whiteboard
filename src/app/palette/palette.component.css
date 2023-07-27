@@ -31,3 +31,8 @@
   /* border: 3px solid green; */
   box-shadow: 5px 10px 5px #888888;
 }
+
+.color-picker {
+  width: 10%;
+  height: 10%;
+}

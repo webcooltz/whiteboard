@@ -267,3 +267,4 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
 
 // todo
 // -add different line styles: dotted, dashed, square, round, etc.
+// -when leaving canvas, stop drawing

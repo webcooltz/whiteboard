@@ -3,7 +3,7 @@
 <!--Page container-->
 <div class="palette-container">
   <!--Misc section-->
-  <div class="palette-container">
+  <div class="palette__box">
     <button class="palette__button"
       (click)="clearCanvas()">
       Clear <i class="fas fa-soap"></i>
@@ -20,16 +20,7 @@
   </div>
   <!--Color section-->
   <div class="palette__box">
-    <!--Color outline-->
-    <div class="palette__outline"
-      *ngFor="let color of palette.colors"
-      [ngStyle]="{'border': color === palette.userSelections.color ? '2px solid blue' : 'none'}">
-      <!--Color box-->
-      <div class="palette__item"
-        [ngStyle]="{'background-color': color}"
-        (click)="selectColor(color)">
-      </div>
-    </div>
+    <input [(colorPicker)]="this.palette.userSelections.color" [style.background]="this.palette.userSelections.color" (colorPickerChange)="onColorChange($event)" class="color-picker"/>
   </div>
   <!--Tool section-->
   <div class="palette__box">
