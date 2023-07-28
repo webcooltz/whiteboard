@@ -3,8 +3,6 @@
 .palette-container {
   width: 100%;
   height: 100%;
-  /* position: absolute; */
-  /* z-index: 1; */
   display: grid;
   grid-template-columns: 1fr 1fr;
   grid-template-rows: 1fr 1fr;
@@ -18,21 +16,43 @@
 
 .palette__outline {
   width: 100%;
-  height: 100%;
+  height: 50%;
 }
 
 .palette__item {
   width: 100%;
   height: 100%;
   cursor: pointer;
+  padding: 0.1em;
 }
 
-.palette__color:hover {
-  /* border: 3px solid green; */
-  box-shadow: 5px 10px 5px #888888;
+.palette__item:hover {
+  box-shadow: 0 0 5px 2px #888888;
 }
 
 .color-picker {
   width: 10%;
   height: 10%;
+}
+
+#tool-options {
+  width: 50%;
+  height: 50%;
+  display: flex;
+}
+
+#tool-options-item {
+  width: 100%;
+  height: 100%;
+}
+
+#tool-options-item__text {
+  width: 100%;
+  height: 100%;
+  padding: 0.1em;
+  border: 1px solid black;
+}
+
+#tool-options-item__text:hover {
+  box-shadow: 0 0 5px 2px #888888;
 }

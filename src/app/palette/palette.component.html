@@ -4,23 +4,60 @@
 <div class="palette-container">
   <!--Misc section-->
   <div class="palette__box">
+    <!--Clear canvas-->
     <button class="palette__button"
       (click)="clearCanvas()">
       Clear <i class="fas fa-soap"></i>
     </button>
+    <!--Brush size-->
     <div class="brush__size__container">
-      <label class="brush__size__label">Brush Size</label>
-      <input class="brush__size__input"
-        type="number"
-        min="1"
-        max="100"
-        [(ngModel)]="palette.userSelections.brushSize"
-        (ngModelChange)="updateBrushSize($event)">
+      <div class="brush__size__item">
+        <label class="brush__size__label">Brush Size</label>
+        <input class="brush__size__input"
+          type="number"
+          min="1"
+          max="100"
+          [(ngModel)]="palette.userSelections.brushSize"
+          (ngModelChange)="updateBrushSize($event)">
+      </div>
+    </div>
+    <div class="brush__shape__container">
+      <div class="brush__size__item">
+        <ul>
+          <li>
+            <label class="brush__size__label">Round</label>
+            <input class="brush__shape__input"
+              type="radio"
+              name="brushShape"
+              value="round"
+              [(ngModel)]="palette.userSelections.brushShape"
+              (ngModelChange)="updateBrushShape($event)">
+          </li>
+          <li>
+            <label class="brush__size__label">Square</label>
+            <input class="brush__shape__input"
+              type="radio"
+              name="brushShape"
+              value="square"
+              [(ngModel)]="palette.userSelections.brushShape"
+              (ngModelChange)="updateBrushShape($event)">
+          </li>
+          <li>
+            <label class="brush__size__label">Butt</label>
+            <input class="brush__shape__input"
+              type="radio"
+              name="brushShape"
+              value="butt"
+              [(ngModel)]="palette.userSelections.brushShape"
+              (ngModelChange)="updateBrushShape($event)">
+          </li>
+        </ul>
+      </div>
     </div>
   </div>
   <!--Color section-->
   <div class="palette__box">
-    <input [(colorPicker)]="this.palette.userSelections.color" [style.background]="this.palette.userSelections.color" (colorPickerChange)="onColorChange($event)" class="color-picker"/>
+    <input [(colorPicker)]="palette.userSelections.color" [style.background]="palette.userSelections.color" (colorPickerChange)="onColorChange($event)" class="color-picker"/>
   </div>
   <!--Tool section-->
   <div class="palette__box">
@@ -30,10 +67,48 @@
       [ngStyle]="{'border': tool === palette.userSelections.tool ? '2px solid blue' : 'none'}">
       <!--tool box-->
       <div class="palette__item"
+        #toolItem
         (click)="selectTool(tool)">
         {{ tool.name }}
         <i [class]="tool.icon"></i>
-        <!-- <img [src]="tool.icon" [alt]="tool.name"> -->
+        <!--tool options-->
+        <div id="tool-options"
+          *ngIf="palette.userSelections.tool.contextMenuVisible">
+          <div
+            #toolOptionItem
+            id="tool-options-item"
+            *ngFor="let toolOption of palette.userSelections.tool.options"
+            [ngStyle]="{'border': toolOption === palette.userSelections.tool.selectedOption && tool.name === palette.userSelections.tool.name &&  palette.userSelections.tool.options.length > 1 ? '2px solid blue' : 'none'}">
+            <div
+              id="tool-options-item__text"
+              *ngIf="tool.name === palette.userSelections.tool.name && palette.userSelections.tool.options.length > 1"
+              (click)="selectToolOption(toolOption)">
+              {{ toolOption.name }}
+            </div>
+          </div>
+          <!--Spraypaint options-->
+          <div class="spraypaint__options"
+            *ngIf="tool.name.toLowerCase() === 'spraypaint'">
+            <div class="brush__size__item">
+              <label class="brush__size__label">Spray Radius (Size)</label>
+              <input class="brush__size__input"
+                type="number"
+                min="1"
+                max="100"
+                [(ngModel)]="palette.userSelections.sprayOptions.radius"
+                (ngModelChange)="updateSprayRadius($event)">
+            </div>
+            <div class="brush__size__item">
+              <label class="brush__size__label">Spray Density</label>
+              <input class="brush__size__input"
+                type="number"
+                min="1"
+                max="100"
+                [(ngModel)]="palette.userSelections.sprayOptions.density"
+                (ngModelChange)="updateSprayDensity($event)">
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>

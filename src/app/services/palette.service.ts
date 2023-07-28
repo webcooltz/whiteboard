@@ -9,13 +9,17 @@ export class PaletteService {
 
   palette: Palette = {
     tools: Palette.availableTools,
-    colors: Palette.availableColors,
     userSelections: {
       tool: Palette.availableTools[0],
-      color: Palette.availableColors[0],
-      secondaryColor: Palette.availableColors[1],
+      color: "#000000",
+      secondaryColor: "#ffffff",
       brushSize: 5,
-    },
+      brushShape: "round",
+      sprayOptions: {
+        radius: 10,
+        density: 100
+      }
+    }
   };
 
   shouldCanvasBeCleared: boolean = false;

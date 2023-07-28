@@ -9,23 +9,22 @@ import { Subscription } from 'rxjs';
   styleUrls: ['./canvas.component.css']
 })
 export class CanvasComponent implements AfterViewInit, OnDestroy {
-  // ---set up canvases---
+  // ---Canvas setup---
   @ViewChild('whiteboard', { static: false }) canvasRef!: ElementRef<HTMLCanvasElement>;
   @ViewChild('previewCanvas', { static: false }) previewCanvasRef!: ElementRef<HTMLCanvasElement>;
   private canvas!: HTMLCanvasElement;
   private ctx!: CanvasRenderingContext2D;
   private previewCanvas!: HTMLCanvasElement;
   private previewCtx!: CanvasRenderingContext2D;
-  // ---set up palette---
+  // ---Palette setup---
   palette: Palette;
   paletteChangeSub: Subscription;
   canvasChangeSub: Subscription;
-  // ---other vars---
+  // ---Remember last selections---
   private lastColor: string = "#000000";
   private lastBrushSize: number = 5;
+  private lastBrushShape: string = "round";
   private lastToolName: string = "pen";
-  private sprayPaintRadius: number = 10; // Adjust the radius as needed
-  private isDrawingLine: boolean = false;
 
   constructor(private paletteService: PaletteService) {
     this.palette = this.paletteService.getPalette();
@@ -35,8 +34,6 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
     .subscribe(
       (palette: Palette) => {
         this.palette = palette;
-        // this.updateStrokeColor();
-        // this.updateBrushSize();
         this.updateUserSelections();
         this.updateToolSelection();
       }
@@ -59,6 +56,7 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
     this.ctx = this.canvas.getContext('2d')!;
     this.ctx.strokeStyle = "#000000"; // default stroke color = black
     this.ctx.lineWidth = 5; // default brush size = 5
+    this.ctx.setLineDash([]); // default line dash = solid
 
     // Initialize the preview canvas
     this.previewCanvas = this.previewCanvasRef.nativeElement;
@@ -82,6 +80,7 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
 
     // when mouse is down, start drawing
     this.canvas.addEventListener('mousedown', (event) => {
+      if (event.button !== 0) return; // Only draw when left mouse button is pressed (button 0
       const { offsetX, offsetY } = event;
 
       if (this.palette.userSelections.tool.name.toLowerCase() === 'pen' || this.palette.userSelections.tool.name.toLowerCase() === 'eraser') {
@@ -91,6 +90,10 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
 
         if (this.palette.userSelections.tool.name.toLowerCase() === 'pen') {
           isLineTool = false; // For the pen tool, draw points, not lines
+          if (this.palette.userSelections.tool.selectedOption.name.toLowerCase() === 'marker') {
+            this.ctx.lineCap = 'square'; // For the marker tool, use a square brush shape
+            this.ctx.globalCompositeOperation = 'source-over'; // Set the globalCompositeOperation to 'source-over' (default)
+          }
         } else if (this.palette.userSelections.tool.name.toLowerCase() === 'eraser') {
           isLineTool = false; // The same for the eraser tool
           this.ctx.globalCompositeOperation = 'destination-out'; // Enable erasing
@@ -109,7 +112,7 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
         // Start spraying paint
         isDrawing = true;
         this.sprayPaint(event.offsetX, event.offsetY);
-      } else {
+      }  else {
         isDrawing = false;
         isLineTool = false;
       }
@@ -148,7 +151,7 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
       } else {
         isDrawing = false;
         isLineTool = false;
-        console.log("Tool is not working");
+        console.log("Tool is not working -- mousemove");
       }
     });
 
@@ -178,14 +181,13 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
   }
 
   sprayPaint(x: number, y: number): void {
-    // if (this.isSpraying) {
-      const density = 100; // Adjust the density of paint droplets as needed
+      // this.palette.userSelections.sprayOptions.density = 100; // Adjust the density of paint droplets as needed
       const ctx = this.ctx;
 
-      for (let i = 0; i < density; i++) {
+      for (let i = 0; i < this.palette.userSelections.sprayOptions.density; i++) {
         // Calculate random positions within the spray paint radius
-        const randomX = x + (Math.random() - 0.5) * 2 * this.sprayPaintRadius;
-        const randomY = y + (Math.random() - 0.5) * 2 * this.sprayPaintRadius;
+        const randomX = x + (Math.random() - 0.5) * 2 * this.palette.userSelections.sprayOptions.radius;
+        const randomY = y + (Math.random() - 0.5) * 2 * this.palette.userSelections.sprayOptions.radius;
 
         // Draw a small circle (paint droplet) at the random position
         ctx.beginPath();
@@ -193,7 +195,6 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
         ctx.fillStyle = this.palette.userSelections.color;
         ctx.fill();
       }
-    // }
   }
 
   // clear canvas
@@ -204,9 +205,48 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
   updateStrokeColor(): void {
     this.ctx.strokeStyle = this.palette.userSelections.color;
   }
-
   updateBrushSize(): void {
     this.ctx.lineWidth = this.palette.userSelections.brushSize;
+  }
+  updateBrushShape(): void {
+    switch(this.palette.userSelections.brushShape) {
+      case 'round':
+        this.ctx.lineCap = 'round';
+        break;
+      case 'square':
+        this.ctx.lineCap = 'square';
+        break;
+      case 'butt':
+        this.ctx.lineCap = 'butt';
+        break;
+      default:
+        this.ctx.lineCap = 'round';
+        break;
+    }
+  }
+  updateLineDash(): void {
+    console.log("updateLineDash(): ", this.palette.userSelections.tool.selectedOption.name.toLowerCase());
+    const brushSize = this.palette.userSelections.brushSize;
+    switch (this.palette.userSelections.tool.selectedOption.name.toLowerCase()) {
+      case 'solid':
+        this.ctx.setLineDash([]); // Make the line solid (no dash, continuous line)
+        break;
+      case 'dotted':
+        this.ctx.setLineDash([5, 2 * brushSize]); // Make the line dotted with ___-pixel dashes and ___-pixel gaps
+        break;
+      case 'dashed':
+        this.ctx.setLineDash([10 * brushSize/2, 5 * brushSize/2]); // Make the line dashed with ___-pixel dashes and ___-pixel gaps
+        break;
+      default:
+        this.ctx.setLineDash([]); // Default to solid if an invalid option is provided
+        break;
+    }
+  }
+  updateUserSelections(): void {
+    this.updateStrokeColor();
+    this.updateBrushSize();
+    this.updateBrushShape();
+    this.updateLineDash();
   }
 
   updateToolSelection(): void {
@@ -220,7 +260,7 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
     // if eraser
     if (this.palette.userSelections.tool.name.toLowerCase() === "eraser") {
       this.saveToolOptions();
-      this.ctx.lineCap = 'square';
+      this.palette.userSelections.brushShape = "square";
       this.palette.userSelections.color = "#FFFFFF";
       this.palette.userSelections.brushSize = 10;
       this.saveLastTool();
@@ -229,14 +269,12 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
       if (this.lastToolName === 'eraser') {
         this.revertToolOptions();
       }
-      this.ctx.lineCap = 'round';
       this.saveLastTool();
     // if line tool
     } else if (this.palette.userSelections.tool.name.toLowerCase() === "line") {
       if (this.lastToolName === 'eraser') {
         this.revertToolOptions();
       }
-      this.ctx.lineCap = 'round';
       this.saveLastTool();
     } else {
       console.log("Tool is not working -- updateToolSelection()");
@@ -244,27 +282,21 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
     this.updateUserSelections();
   }
 
-  updateUserSelections(): void {
-    this.updateStrokeColor();
-    this.updateBrushSize();
-    // this.updateToolSelection();
-  }
-
   saveToolOptions(): void {
     this.lastColor = this.palette.userSelections.color;
     this.lastBrushSize = this.palette.userSelections.brushSize;
+    this.lastBrushShape = this.palette.userSelections.brushShape;
   }
-
   revertToolOptions(): void {
     this.palette.userSelections.color = this.lastColor;
     this.palette.userSelections.brushSize = this.lastBrushSize;
+    this.palette.userSelections.brushShape = this.lastBrushShape;
   }
-
   saveLastTool(): void {
     this.lastToolName = this.palette.userSelections.tool.name.toLowerCase();
   }
 }
 
 // todo
-// -add different line styles: dotted, dashed, square, round, etc.
 // -when leaving canvas, stop drawing
+// -check isLineTool if it works

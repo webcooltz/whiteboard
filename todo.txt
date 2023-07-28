@@ -3,10 +3,15 @@
 to-do
 -when window is resized, canvas is resized
   -use window.onresize
--if eraser is selected, picking another color changes it back to pen
+-if eraser is selected, picking another color changes it back to last tool
 -make palette smaller
 -make palette boxes smaller
--bigger, more dynamic, color picker
+-draw secondary on right click
+-pick tool options by right click
+-change page font
+-mobile-friendly
+-style better
+-enable/disable features
 
 done
 -eraser
@@ -16,6 +21,8 @@ done
 -clear button
 -add icons
 -brush size
+-new color picker
+-remember last color and tool used
 
 ---minimum viable products---
 
@@ -35,6 +42,13 @@ etch-a-sketch
 -raspberry pi setup
 -user draws with touch screen, mouse, or touch pad(?) OR another device
 
+art board
+-canvas for artists to do digital art
+-include uploading images, tracing, etc.
+
+paint by numbers
+-advanced paint by numbers
+
 ---features---
 
 potential ideas
@@ -49,12 +63,10 @@ color/tool picker
 -service? to communicate with canvas component
 
 other features
--other colors
 -other brushes
 -shapes
 -undo/redo
   -Remember to save the state of the canvas before each change?
-  -OR ask ChatGPT
 -clear
 -pan
 -zoom
@@ -62,20 +74,13 @@ other features
 -rotate
 -rectangle
 -circle
--line
-  -click and click again?
-  -OR click and drag? **preferred**
-  -change event listener? like an if statement for each tool
-    -IF -- have event listeners under each if statement?
-      -example: if (tool === 'line') { canvas.addEventListener('mousedown', drawLine) }
-    -OR -- have if statements under each event listener
 -polygon
 -images and image manipulation
 -text
 -clipart/icons & search
 -background color
 -stamps
--spraypaint
+-fill tool
 
 ---design---
 
