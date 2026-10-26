@@ -1,0 +1,52 @@
+<div class="bar">
+  <div class="line">
+    <span class="dot" [class.on]="board.status === 'online'" [class.warn]="board.status !== 'online'"></span>
+    <strong>{{ statusText }}</strong>
+    <span class="who" *ngIf="board.users.length">Online: {{ board.users.join(', ') }}</span>
+  </div>
+
+  <div class="buttons">
+    <button type="button" (click)="board.undo()" title="Undo your last stroke (Ctrl+Z)">Undo</button>
+    <button type="button" (click)="startSave()" *ngIf="!saving">Save board…</button>
+    <button type="button" (click)="showBoards = !showBoards" [attr.aria-expanded]="showBoards">Saved boards ({{ board.boards.length }})</button>
+    <button type="button" (click)="board.downloadPng()">Download PNG</button>
+    <button type="button" (click)="toggleActivity()" [attr.aria-expanded]="showActivity">Activity</button>
+    <button type="button" class="danger" (click)="erase()">Erase board</button>
+    <button type="button" (click)="auth.logout()">Sign out ({{ auth.user }})</button>
+  </div>
+
+  <form class="save" *ngIf="saving" (ngSubmit)="confirmSave()">
+    <input name="saveName" [(ngModel)]="saveName" placeholder="Name this board" maxlength="40" autofocus>
+    <button type="submit" [disabled]="!saveName.trim()">Save</button>
+    <button type="button" (click)="cancelSave()">Cancel</button>
+  </form>
+
+  <div class="toast" *ngIf="board.message" role="status">{{ board.message }}</div>
+
+  <ul class="boards" *ngIf="showBoards">
+    <li *ngIf="!board.boards.length">No saved boards yet.</li>
+    <li *ngFor="let b of board.boards; trackBy: trackName">
+      <div class="meta">
+        <strong>{{ b.name }}</strong>
+        <small>{{ b.count }} strokes · {{ b.savedBy }} · {{ when(b.savedAt) }}</small>
+      </div>
+      <button type="button" (click)="load(b)">Load</button>
+      <button type="button" class="danger" (click)="remove(b)">Delete</button>
+    </li>
+  </ul>
+
+  <div class="activity" *ngIf="showActivity">
+    <div class="activity-head">
+      <strong>Who did what</strong>
+      <label><input type="checkbox" [(ngModel)]="showDrawing"> show every stroke &amp; connection</label>
+      <button type="button" (click)="board.refreshAudit()">Refresh</button>
+    </div>
+    <ul>
+      <li *ngIf="!entries.length">Nothing yet.</li>
+      <li *ngFor="let e of entries">
+        <time>{{ when(e.ts) }}</time>
+        <strong>{{ e.user || 'someone' }}</strong> {{ describe(e) }}
+      </li>
+    </ul>
+  </div>
+</div>

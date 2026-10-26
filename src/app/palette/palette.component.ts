@@ -51,10 +51,6 @@ export class PaletteComponent implements OnInit, OnDestroy {
     this.paletteService.setPalette(this.palette);
   }
 
-  clearCanvas(): void {
-    this.paletteService.clearCanvas(true);
-  }
-
   updateBrushSize(brushSize: number): void {
     this.palette.userSelections.brushSize = brushSize;
     this.paletteService.setPalette(this.palette);

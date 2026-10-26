@@ -1,0 +1,13 @@
+<form class="login" (ngSubmit)="submit()" autocomplete="on">
+  <h1>Whiteboard</h1>
+  <label>
+    Your name
+    <input name="name" [(ngModel)]="name" autocomplete="username" maxlength="24" required autofocus>
+  </label>
+  <label>
+    Password
+    <input name="password" type="password" [(ngModel)]="password" autocomplete="current-password" required>
+  </label>
+  <button type="submit" [disabled]="auth.busy || !name.trim() || !password">{{ auth.busy ? 'Signing in…' : 'Sign in' }}</button>
+  <p class="error" *ngIf="auth.error" role="alert">{{ auth.error }}</p>
+</form>

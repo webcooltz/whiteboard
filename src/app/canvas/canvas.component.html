@@ -1,4 +1,17 @@
-<div class="canvas-container">
-  <canvas #whiteboard width="800" height="600"></canvas>
-  <canvas #previewCanvas width="800" height="600"></canvas>
+<div class="wrap">
+  <div class="stage" #stage>
+    <div class="frame" #frame>
+      <canvas #whiteboard class="layer board" width="1600" height="900" tabindex="0"
+        role="application"
+        aria-label="Shared whiteboard. Arrow keys move the cursor, Space starts and stops drawing, Escape stops, Control+Z undoes."></canvas>
+      <canvas #overlay class="layer overlay" width="1600" height="900" aria-hidden="true"></canvas>
+      <div class="banner" *ngIf="board.status !== 'online'" role="status">
+        {{ board.status === 'connecting' ? 'Connecting…' : 'Offline — reconnecting. Drawing is paused.' }}
+      </div>
+    </div>
+  </div>
+  <p class="hint" *ngIf="!auth.readOnly">
+    Draw with mouse, touch or pen. Keyboard: Tab to the board, arrows move (Shift = big steps, Alt = small),
+    Space starts/stops drawing, Ctrl+Z undoes.
+  </p>
 </div>

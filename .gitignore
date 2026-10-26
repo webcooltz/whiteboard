@@ -40,3 +40,6 @@ testem.log
 # System files
 .DS_Store
 Thumbs.db
+
+# Board server data (saved boards, audit log, secrets) — never commit
+/data

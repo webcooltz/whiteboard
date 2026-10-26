@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Application
+Name=Whiteboard kiosk
+Exec=env WHITEBOARD_URL=http://192.168.1.20:8080 DEVICE_KEY=replace-with-this-pis-key /home/pi/whiteboard/kiosk.sh
+X-GNOME-Autostart-enabled=true

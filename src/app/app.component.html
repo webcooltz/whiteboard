@@ -1,5 +1,11 @@
-<div class="page-container">
-  <app-palette></app-palette>
-  <app-canvas></app-canvas>
-</div>
+<app-login *ngIf="!auth.token"></app-login>
 
+<div class="page" *ngIf="auth.token">
+  <aside class="side" *ngIf="!auth.readOnly">
+    <app-board-menu></app-board-menu>
+    <app-palette class="palette"></app-palette>
+  </aside>
+  <main class="board">
+    <app-canvas></app-canvas>
+  </main>
+</div>

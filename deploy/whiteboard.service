@@ -1,0 +1,25 @@
+# Keeps the board server running permanently and restarts it after crashes or reboots.
+# Install:  sudo cp deploy/whiteboard.service /etc/systemd/system/
+#           sudo cp deploy/whiteboard.env.example /etc/whiteboard.env   (then edit it, chmod 600)
+#           sudo systemctl daemon-reload && sudo systemctl enable --now whiteboard
+[Unit]
+Description=Shared whiteboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=whiteboard
+WorkingDirectory=/opt/whiteboard
+EnvironmentFile=/etc/whiteboard.env
+ExecStart=/usr/bin/node server/index.mjs
+Restart=always
+RestartSec=3
+# Hardening: the server only needs to write its own data directory.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/whiteboard
+
+[Install]
+WantedBy=multi-user.target
