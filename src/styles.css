@@ -1,2 +1,4 @@
 /* Global styles */
+@import '@fortawesome/fontawesome-free/css/all.css';
+
 html, body { margin: 0; height: 100%; }

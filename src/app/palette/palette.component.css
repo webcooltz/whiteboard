@@ -1,58 +1,81 @@
-@import '~@fortawesome/fontawesome-free/css/all.css';
+/* Sized for the side panel: each section is as tall as its content. */
+:host {
+  display: block;
+  padding: 0 0.6rem 0.6rem;
+  font-size: 14px;
+}
+
+.palette__title h2 {
+  margin: 0.5rem 0;
+  font-size: 1.2rem;
+}
 
 .palette-container {
-  width: 100%;
-  height: 100%;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
 }
 
 .palette__box {
-  width: 100%;
-  height: 100%;
   display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+
+.palette__box ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 0.8rem;
+}
+
+.palette__box input[type=number] {
+  width: 4rem;
+  margin-left: 0.4rem;
 }
 
 .palette__outline {
-  width: 100%;
-  height: 50%;
+  flex: 1 1 calc(50% - 0.4rem);
+  border-radius: 4px;
 }
 
 .palette__item {
-  width: 100%;
-  height: 100%;
   cursor: pointer;
-  padding: 0.1em;
+  padding: 0.3em;
 }
 
 .palette__item:hover {
   box-shadow: 0 0 5px 2px #888888;
 }
 
-.color-picker {
-  width: 10%;
-  height: 10%;
+.color-swatch {
+  width: 100%;
+  height: 2rem;
+  box-sizing: border-box;
+  border: 1px solid #bbb;
+  border-radius: 4px;
+  color: transparent;
+  cursor: pointer;
 }
 
 #tool-options {
-  width: 50%;
-  height: 50%;
   display: flex;
-}
-
-#tool-options-item {
-  width: 100%;
-  height: 100%;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
 }
 
 #tool-options-item__text {
-  width: 100%;
-  height: 100%;
-  padding: 0.1em;
+  padding: 0.1em 0.3em;
   border: 1px solid black;
 }
 
 #tool-options-item__text:hover {
   box-shadow: 0 0 5px 2px #888888;
+}
+
+.spraypaint__options .brush__size__item {
+  margin-top: 0.2rem;
 }

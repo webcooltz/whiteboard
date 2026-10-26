@@ -2,6 +2,7 @@
 import http from 'node:http';
 import { existsSync, readFileSync, statSync, mkdirSync } from 'node:fs';
 import { join, extname, normalize, sep } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { loadConfig } from './config.mjs';
 import { AuditLog } from './audit.mjs';
 import { Store } from './store.mjs';
@@ -173,7 +174,8 @@ export async function createServer(config = loadConfig()) {
 }
 
 // Run directly: node server/index.mjs
-if (import.meta.url === `file://${process.argv[1]}`) {
+// pathToFileURL, not `file://${argv[1]}`: that never matches on Windows (C:\...) or for paths with spaces.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const config = loadConfig();
   try {
     const app = await createServer(config);

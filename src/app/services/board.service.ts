@@ -24,6 +24,7 @@ export class BoardService {
     this.client = new BoardClient(wsUrl, () => this.auth.token);
     this.client.onStatus = (s) => {
       this.status = s;
+      if (s !== 'online') this.users = []; // the server sends a fresh list when we reconnect
       if (s === 'auth-failed') void this.auth.handleRejected();
     };
     this.client.onMessage = (m) => this.onMessage(m);
