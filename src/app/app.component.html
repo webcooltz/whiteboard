@@ -1,10 +1,8 @@
 <app-login *ngIf="!auth.token"></app-login>
 
-<div class="page" *ngIf="auth.token">
-  <aside class="side" *ngIf="!auth.readOnly">
-    <app-board-menu></app-board-menu>
-    <app-palette class="palette"></app-palette>
-  </aside>
+<div class="page" [class.kiosk]="auth.readOnly" *ngIf="auth.token">
+  <app-board-menu class="top" *ngIf="!auth.readOnly"></app-board-menu>
+  <app-palette class="side" *ngIf="!auth.readOnly"></app-palette>
   <main class="board">
     <app-canvas></app-canvas>
   </main>

@@ -31,6 +31,7 @@ export class InputController {
   private pointerId: number | null = null;
   private lastCursorSent = 0;
   private kb = { x: 0, y: 0, down: false, active: false };
+  private pointerFocus = false; // focus() from a pointer press: don't show the keyboard cursor
   private cleanup: Array<() => void> = [];
 
   constructor(canvas: HTMLCanvasElement, board: BoardView, getTool: () => ToolState, net: Net) {
@@ -64,8 +65,8 @@ export class InputController {
     this.on(c, 'pointercancel', (e: PointerEvent) => this.onUp(e));
     this.on(c, 'lostpointercapture', (e: PointerEvent) => this.onUp(e));
     this.on(c, 'keydown', (e: KeyboardEvent) => this.onKey(e));
-    this.on(c, 'focus', () => { this.kb.active = true; this.showKb(); });
-    this.on(c, 'blur', () => { this.finish(); this.kb.down = false; this.kb.active = false; this.board.setLocalCursor(null); });
+    this.on(c, 'focus', () => { if (!this.pointerFocus) { this.kb.active = true; this.showKb(); } });
+    this.on(c, 'blur', () => { this.finish(); this.kb.down = false; this.kb.active = false; this.showKb(); });
     this.on(window, 'blur', () => this.finish());
   }
 
@@ -82,7 +83,9 @@ export class InputController {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     if (this.pointerId !== null) return; // one finger/pen at a time
     e.preventDefault();
+    this.pointerFocus = true;
     this.canvas.focus({ preventScroll: true });
+    this.pointerFocus = false;
     const [x, y] = this.toBoard(e);
     if (!this.start(x, y)) return;
     this.pointerId = e.pointerId;
@@ -112,6 +115,7 @@ export class InputController {
     }
     if (k === ' ' || k === 'Enter') {
       e.preventDefault();
+      this.kb.active = true;
       if (e.repeat) return;
       if (this.kb.down) { this.kb.down = false; this.finish(); }
       else if (this.start(this.kb.x, this.kb.y)) this.kb.down = true;
@@ -123,6 +127,7 @@ export class InputController {
     const d = k === 'ArrowLeft' ? [-step, 0] : k === 'ArrowRight' ? [step, 0] : k === 'ArrowUp' ? [0, -step] : k === 'ArrowDown' ? [0, step] : null;
     if (!d) return;
     e.preventDefault();
+    this.kb.active = true;
     this.kb.x = Math.min(this.board.w, Math.max(0, this.kb.x + d[0]));
     this.kb.y = Math.min(this.board.h, Math.max(0, this.kb.y + d[1]));
     if (this.kb.down) this.add(this.kb.x, this.kb.y, true);
@@ -131,6 +136,7 @@ export class InputController {
   }
 
   private showKb(): void {
+    this.canvas.classList.toggle('kb', this.kb.active);
     this.board.setLocalCursor(this.kb.active ? { x: this.kb.x, y: this.kb.y, down: this.kb.down } : null);
   }
 

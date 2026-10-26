@@ -1,9 +1,28 @@
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-export function loadConfig(env = process.env) {
+/** KEY=value lines from an env file (# comments, optional quotes). Real environment variables win. */
+export function readEnvFile(file) {
+  const out = {};
+  if (!existsSync(file)) return out;
+  for (const line of readFileSync(file, 'utf8').split(/\r?\n/)) {
+    const m = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
+    if (!m) continue;
+    let v = m[2];
+    if (/^(["']).*\1$/.test(v)) v = v.slice(1, -1);
+    else v = v.replace(/\s+#.*$/, '');
+    out[m[1]] = v;
+  }
+  return out;
+}
+
+// The project's .env (or the file named by ENV_FILE), under the real environment.
+const withEnvFile = (env) => ({ ...readEnvFile(resolve(env.ENV_FILE || join(root, '.env'))), ...env });
+
+export function loadConfig(env = withEnvFile(process.env)) {
   const dataDir = resolve(env.DATA_DIR || join(root, 'data'));
   const deviceKeys = {};
   for (const pair of (env.BOARD_DEVICE_KEYS || '').split(',')) {

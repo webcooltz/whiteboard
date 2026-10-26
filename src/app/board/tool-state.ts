@@ -21,6 +21,9 @@ export interface SelectionsLike {
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, Number.isFinite(v) ? v : lo));
 
+// Brush names (and the older pen sub-options marker / pencil / crayon) -> the stroke kind they draw.
+const BRUSHES: Record<string, ToolKind> = { pen: 'pen', pencil: 'pencil', marker: 'marker', highlighter: 'highlighter', crayon: 'crayon' };
+
 export function toolStateFrom(sel: SelectionsLike): ToolState {
   const name = sel.tool.name.toLowerCase();
   const option = sel.tool.selectedOption.name.toLowerCase();
@@ -32,12 +35,12 @@ export function toolStateFrom(sel: SelectionsLike): ToolState {
     density: clamp(Math.round(sel.sprayOptions.density), 1, 200),
   };
   if (name === 'eraser') return { ...base, tool: 'eraser', size: clamp(size * 2, 1, 200), cap: 'round', dash: [] };
-  if (name === 'spraypaint') return { ...base, tool: 'spray', size, cap, dash: [] };
+  if (name === 'spray' || name === 'spraypaint') return { ...base, tool: 'spray', size, cap, dash: [] };
   if (name === 'line') {
-    const dash = option === 'dotted' ? [1, size * 2] : option === 'dashed' ? [size * 3, size * 2] : [];
+    const dash = option === 'dotted' ? [1, size * 2] : option === 'dashed' ? [size * 2.5, size * 2.5] : [];
     if (option === 'dotted') cap = 'round';
     return { ...base, tool: 'line', size, cap, dash };
   }
-  if (option === 'marker') cap = 'square';
-  return { ...base, tool: 'pen', size, cap, dash: [] };
+  const tool = BRUSHES[name] ?? (name === 'pen' ? BRUSHES[option] : undefined) ?? 'pen';
+  return { ...base, tool, size, cap: 'round', dash: [] };
 }

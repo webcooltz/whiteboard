@@ -1,5 +1,5 @@
 // Framework-free board types. Keep this folder free of Angular imports so it can be tested in plain Node/browsers.
-export type ToolKind = 'pen' | 'eraser' | 'line' | 'spray';
+export type ToolKind = 'pen' | 'pencil' | 'marker' | 'highlighter' | 'crayon' | 'eraser' | 'line' | 'spray';
 export type Cap = 'round' | 'square' | 'butt';
 
 export interface Stroke {

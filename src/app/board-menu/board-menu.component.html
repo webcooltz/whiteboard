@@ -1,52 +1,110 @@
-<div class="bar">
-  <div class="line">
-    <span class="dot" [class.on]="board.status === 'online'" [class.warn]="board.status !== 'online'"></span>
-    <strong>{{ statusText }}</strong>
-    <span class="who" *ngIf="board.users.length">Online: {{ board.users.join(', ') }}</span>
+<header class="bar">
+  <div class="brand"><span class="logo"><i class="fas fa-pen-nib"></i></span><span class="name">Whiteboard</span></div>
+
+  <span class="status" [class.live]="board.status === 'online'" role="status">
+    <span class="dot"></span>{{ statusText }}
+  </span>
+
+  <div class="people" *ngIf="board.users.length" [title]="'Online: ' + board.users.join(', ')">
+    <span class="avatar" *ngFor="let u of board.users.slice(0, 4)" [style.background]="colorFor(u)">{{ initials(u) }}</span>
+    <span class="avatar more" *ngIf="board.users.length > 4">+{{ board.users.length - 4 }}</span>
   </div>
 
-  <div class="buttons">
-    <button type="button" (click)="board.undo()" title="Undo your last stroke (Ctrl+Z)">Undo</button>
-    <button type="button" (click)="startSave()" *ngIf="!saving">Save board…</button>
-    <button type="button" (click)="showBoards = !showBoards" [attr.aria-expanded]="showBoards">Saved boards ({{ board.boards.length }})</button>
-    <button type="button" (click)="board.downloadPng()">Download PNG</button>
-    <button type="button" (click)="toggleActivity()" [attr.aria-expanded]="showActivity">Activity</button>
-    <button type="button" class="danger" (click)="erase()">Erase board</button>
-    <button type="button" (click)="auth.logout()">Sign out ({{ auth.user }})</button>
-  </div>
+  <div class="spacer"></div>
 
-  <form class="save" *ngIf="saving" (ngSubmit)="confirmSave()">
-    <input name="saveName" [(ngModel)]="saveName" placeholder="Name this board" maxlength="40" autofocus>
-    <button type="submit" [disabled]="!saveName.trim()">Save</button>
-    <button type="button" (click)="cancelSave()">Cancel</button>
-  </form>
+  <nav class="actions" aria-label="Board">
+    <button class="btn ghost" type="button" (click)="board.undo()" title="Undo your last stroke (Ctrl+Z)">
+      <i class="fas fa-rotate-left"></i><span class="lbl">Undo</span>
+    </button>
+    <span class="sep"></span>
+    <button class="btn ghost" type="button" (click)="startSave()" title="Save a copy of this board">
+      <i class="fas fa-floppy-disk"></i><span class="lbl">Save</span>
+    </button>
+    <button class="btn ghost" type="button" [class.on]="panel === 'boards'" (click)="toggle('boards')" [attr.aria-expanded]="panel === 'boards'" title="Saved boards">
+      <i class="fas fa-folder-open"></i><span class="lbl">Boards</span><span class="count" *ngIf="board.boards.length">{{ board.boards.length }}</span>
+    </button>
+    <button class="btn ghost" type="button" [class.on]="panel === 'activity'" (click)="toggle('activity')" [attr.aria-expanded]="panel === 'activity'" title="Who did what">
+      <i class="fas fa-clock-rotate-left"></i><span class="lbl">Activity</span>
+    </button>
+    <button class="btn ghost" type="button" (click)="board.downloadPng()" title="Download as PNG">
+      <i class="fas fa-download"></i><span class="lbl">PNG</span>
+    </button>
+    <button class="btn ghost danger" type="button" (click)="erase()" title="Erase the board for everyone (a backup is saved)">
+      <i class="fas fa-trash-can"></i><span class="lbl">Erase</span>
+    </button>
+  </nav>
 
-  <div class="toast" *ngIf="board.message" role="status">{{ board.message }}</div>
+  <button class="chip" type="button" (click)="startRename()" [disabled]="!auth.canRename"
+    [title]="auth.canRename ? 'Change your name' : auth.user">
+    <span class="avatar" [style.background]="colorFor(auth.user)">{{ initials(auth.user) }}</span>
+    <span class="me">{{ auth.user }}</span>
+    <i class="fas fa-pen edit" *ngIf="auth.canRename"></i>
+  </button>
+</header>
 
-  <ul class="boards" *ngIf="showBoards">
-    <li *ngIf="!board.boards.length">No saved boards yet.</li>
-    <li *ngFor="let b of board.boards; trackBy: trackName">
-      <div class="meta">
-        <strong>{{ b.name }}</strong>
-        <small>{{ b.count }} strokes · {{ b.savedBy }} · {{ when(b.savedAt) }}</small>
-      </div>
-      <button type="button" (click)="load(b)">Load</button>
-      <button type="button" class="danger" (click)="remove(b)">Delete</button>
-    </li>
-  </ul>
-
-  <div class="activity" *ngIf="showActivity">
-    <div class="activity-head">
-      <strong>Who did what</strong>
-      <label><input type="checkbox" [(ngModel)]="showDrawing"> show every stroke &amp; connection</label>
-      <button type="button" (click)="board.refreshAudit()">Refresh</button>
+<!-- Save dialog -->
+<div class="backdrop" *ngIf="saving" (click)="saving = false">
+  <form class="dialog" (click)="$event.stopPropagation()" (ngSubmit)="confirmSave()" role="dialog" aria-label="Save board">
+    <h2>Save this board</h2>
+    <label class="field">Name
+      <input #dialogInput class="input" name="saveName" [(ngModel)]="saveName" placeholder="e.g. Shopping list" maxlength="40">
+    </label>
+    <div class="actions">
+      <button class="btn" type="button" (click)="saving = false">Cancel</button>
+      <button class="btn primary" type="submit" [disabled]="!saveName.trim()">Save</button>
     </div>
-    <ul>
-      <li *ngIf="!entries.length">Nothing yet.</li>
-      <li *ngFor="let e of entries">
-        <time>{{ when(e.ts) }}</time>
-        <strong>{{ e.user || 'someone' }}</strong> {{ describe(e) }}
+  </form>
+</div>
+
+<!-- Rename dialog -->
+<div class="backdrop" *ngIf="renaming" (click)="renaming = false">
+  <form class="dialog" (click)="$event.stopPropagation()" (ngSubmit)="confirmRename()" role="dialog" aria-label="Your name">
+    <h2>Your name</h2>
+    <label class="field">Shown next to your cursor and in the activity log
+      <input #dialogInput class="input" name="newName" [(ngModel)]="newName" maxlength="24" autocomplete="username">
+    </label>
+    <p class="error" *ngIf="renameError" role="alert">{{ renameError }}</p>
+    <div class="actions">
+      <button class="btn" type="button" (click)="renaming = false">Cancel</button>
+      <button class="btn primary" type="submit" [disabled]="!newName.trim() || auth.busy">Save</button>
+    </div>
+  </form>
+</div>
+
+<!-- Side panels -->
+<aside class="drawer" *ngIf="panel" [attr.aria-label]="panel === 'boards' ? 'Saved boards' : 'Activity'">
+  <div class="drawer-head">
+    <h2>{{ panel === 'boards' ? 'Saved boards' : 'Activity' }}</h2>
+    <button class="btn ghost icon" type="button" (click)="panel = null" title="Close"><i class="fas fa-xmark"></i></button>
+  </div>
+
+  <ng-container *ngIf="panel === 'boards'">
+    <p class="empty" *ngIf="!board.boards.length">Nothing saved yet. Use <b>Save</b> to keep a copy of the board.</p>
+    <ul class="list">
+      <li *ngFor="let b of board.boards; trackBy: trackName" class="board-item">
+        <div class="meta">
+          <strong>{{ b.name }}</strong>
+          <small>{{ b.count }} {{ b.count === 1 ? 'stroke' : 'strokes' }} · {{ b.savedBy }} · {{ when(b.savedAt) }}</small>
+        </div>
+        <button class="btn" type="button" (click)="load(b)">Open</button>
+        <button class="btn ghost icon danger" type="button" (click)="remove(b)" [title]="'Delete ' + b.name"><i class="fas fa-trash-can"></i></button>
       </li>
     </ul>
-  </div>
-</div>
+  </ng-container>
+
+  <ng-container *ngIf="panel === 'activity'">
+    <div class="tools">
+      <label><input type="checkbox" [(ngModel)]="showDrawing"> Show every stroke</label>
+      <button class="btn ghost" type="button" (click)="board.refreshAudit()"><i class="fas fa-rotate"></i> Refresh</button>
+    </div>
+    <p class="empty" *ngIf="!entries.length">Nothing yet.</p>
+    <ul class="list">
+      <li *ngFor="let e of entries" class="event">
+        <span class="avatar sm" [style.background]="colorFor(e.user || '?')">{{ initials(e.user || '?') }}</span>
+        <div><strong>{{ e.user || 'Someone' }}</strong> {{ describe(e) }}<time>{{ when(e.ts) }}</time></div>
+      </li>
+    </ul>
+  </ng-container>
+</aside>
+
+<div class="toast" *ngIf="board.message" role="status">{{ board.message }}</div>

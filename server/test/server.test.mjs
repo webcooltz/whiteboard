@@ -5,7 +5,7 @@ import { mkdtempSync, rmSync, readFileSync, mkdirSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from '../index.mjs';
-import { loadConfig } from '../config.mjs';
+import { loadConfig, readEnvFile } from '../config.mjs';
 import { hashPassword, verifyPassword, signToken, verifyToken } from '../auth.mjs';
 
 let dir, app, port, web;
@@ -141,6 +141,11 @@ test('strokes sync live between users, and late joiners get the board', async ()
   assert.ok(s, 'late joiner sees stroke');
   assert.deepEqual(s.p, [10, 10, 20, 20, 30, 30, 40, 45]);
   assert.deepEqual(carol.hello.users.sort(), ['Ann', 'Bob', 'Carol']);
+
+  for (const [i, tool] of ['pencil', 'marker', 'highlighter', 'crayon'].entries()) {
+    ann.send(stroke(`brush${tool}${i}`, { tool }));
+    assert.equal((await bob.wait((m) => m.t === 'begin' && m.id === `brush${tool}${i}`)).tool, tool);
+  }
   ann.close(); bob.close(); carol.close();
 });
 
@@ -208,6 +213,33 @@ test('save, erase (with automatic backup), load, delete — and all of it is aud
   assert.ok(entries.some((e) => e.ev === 'login_fail'), 'failed logins are logged');
   assert.ok(entries.some((e) => e.ev === 'login_locked'), 'lockouts are logged');
   ann.close();
+});
+
+test('rename: a signed-in person can change their name; devices and bad names cannot', async () => {
+  const post = async (token, name) => {
+    const r = await fetch(`http://127.0.0.1:${port}/api/rename`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: JSON.stringify({ name }) });
+    return { status: r.status, body: await r.json() };
+  };
+  const { body } = await login({ name: 'Ann', password: 'correct horse' });
+  assert.equal((await post(null, 'Annie')).status, 401);
+  assert.equal((await post(body.token, '<script>')).status, 400);
+  const ok = await post(body.token, 'Annie');
+  assert.equal(ok.status, 200);
+  assert.equal(ok.body.user, 'Annie');
+  assert.equal(verifyToken(readFileSync(join(dir, 'data', 'secret.key'), 'utf8').trim(), ok.body.token).user, 'Annie');
+  const c = await connect('Annie', { token: ok.body.token });
+  assert.ok(c.hello.users.includes('Annie'));
+  c.close();
+  const dev = await login({ deviceKey: '0123456789abcdef0123' });
+  assert.equal((await post(dev.body.token, 'Bob')).status, 403);
+  assert.ok(app.audit.tail(20).some((e) => e.ev === 'rename' && e.user === 'Annie' && e.from === 'Ann'));
+});
+
+test('env file: KEY=value lines, comments and quotes; real env wins in loadConfig', () => {
+  const f = join(dir, 'test.env');
+  writeFileSync(f, '# comment\nBOARD_PASSWORD="pa ss # word"\r\nPORT=9090   # inline comment\nexport WHITEBOARD_URL=http://pi:8080\nnot a line\n');
+  assert.deepEqual(readEnvFile(f), { BOARD_PASSWORD: 'pa ss # word', PORT: '9090', WHITEBOARD_URL: 'http://pi:8080' });
+  assert.deepEqual(readEnvFile(join(dir, 'missing.env')), {});
 });
 
 test('audit endpoint needs a token and never contains passwords', async () => {

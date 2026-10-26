@@ -10,10 +10,12 @@ export class LoginComponent {
   name = '';
   password = '';
 
-  constructor(public auth: AuthService) {}
+  constructor(public auth: AuthService) {
+    this.name = auth.user; // the name used last time on this device
+  }
 
   async submit(): Promise<void> {
-    if (!this.name.trim() || !this.password) return;
+    if (!this.name.trim() || (this.auth.needsPassword && !this.password)) return;
     if (await this.auth.login(this.name.trim(), this.password)) this.password = '';
   }
 }

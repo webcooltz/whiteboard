@@ -58,6 +58,8 @@ export async function createServer(config = loadConfig()) {
     res.end(s);
   };
 
+  const bearer = (req) => String(req.headers.authorization || '').replace(/^Bearer /, '');
+
   const readBody = (req, limit = 4096) => new Promise((resolve, reject) => {
     let size = 0; const chunks = [];
     req.on('data', (d) => { size += d.length; if (size > limit) { reject(new Error('too large')); req.destroy(); } else chunks.push(d); });
@@ -107,6 +109,19 @@ export async function createServer(config = loadConfig()) {
     return (await verifyPassword(body.password, sharedHash)) ? ok(name, 'user') : failed(name);
   }
 
+  // Change the name on your session (shared-password mode only: per-person and device names are fixed).
+  async function rename(req, res) {
+    const auth = verifyToken(secret, bearer(req));
+    if (!auth) return json(res, 401, { error: 'Unauthorized' });
+    if (users || auth.kind !== 'user') return json(res, 403, { error: 'This name cannot be changed here' });
+    let body;
+    try { body = JSON.parse(await readBody(req)); } catch { return json(res, 400, { error: 'Bad request' }); }
+    const name = cleanName(body?.name);
+    if (!name) return json(res, 400, { error: "Use 1–24 letters, numbers, spaces or . _ ' -" });
+    if (name !== auth.user) audit.log('rename', name, { from: auth.user, ip: clientIp(req) });
+    return json(res, 200, { token: signToken(secret, name, 'user', config.tokenTtlMs), user: name });
+  }
+
   function serveStatic(req, res, pathname) {
     const base = config.webRoot;
     if (!existsSync(base)) {
@@ -136,10 +151,10 @@ export async function createServer(config = loadConfig()) {
     try {
       const url = new URL(req.url, 'http://x');
       if (req.method === 'POST' && url.pathname === '/api/login') return await login(req, res);
+      if (req.method === 'POST' && url.pathname === '/api/rename') return await rename(req, res);
       if (req.method === 'GET' && url.pathname === '/api/health') return json(res, 200, { ok: true });
       if (req.method === 'GET' && url.pathname === '/api/audit') {
-        const t = (req.headers.authorization || '').replace(/^Bearer /, '');
-        if (!verifyToken(secret, t)) return json(res, 401, { error: 'Unauthorized' });
+        if (!verifyToken(secret, bearer(req))) return json(res, 401, { error: 'Unauthorized' });
         return json(res, 200, { entries: audit.tail(+url.searchParams.get('limit') || 100) });
       }
       if (url.pathname.startsWith('/api/')) return json(res, 404, { error: 'Not found' });

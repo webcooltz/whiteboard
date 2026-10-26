@@ -138,6 +138,23 @@ function buildHarness(dir) {
     assert.deepEqual(cur, ['Ann']);
   });
 
+  await check('pencil, marker, highlighter and crayon: identical on every screen (and for late joiners, below)', async () => {
+    const before = (await bob.evaluate(() => window.hash())).nonEmpty;
+    for (const [i, tool] of ['Pencil', 'Marker', 'Highlighter', 'Crayon'].entries()) {
+      await ann.evaluate(([tool, i]) => {
+        window.setTool(tool, tool.toLowerCase(), { color: '#7a3cf0', brushSize: 9 });
+        const y = 120 + i * 180, id = 20 + i;
+        window.pointer('pointerdown', 300, y, 'pen', id);
+        for (let k = 1; k < 40; k++) window.pointer('pointermove', 300 + k * 25, y + Math.sin(k / 4) * 50, 'pen', id);
+        window.pointer('pointerup', 1300, y, 'pen', id);
+      }, [tool, i]);
+    }
+    const h = await same(ann, bob, 'new brushes');
+    assert.ok(h.nonEmpty > before + 20000, 'the brushes drew');
+    const tools = await bob.evaluate(() => window.view.committed.slice(-4).map((s) => s.tool));
+    assert.deepEqual(tools, ['pencil', 'marker', 'highlighter', 'crayon']);
+  });
+
   await check('a screen that joins late gets exactly the same board', async () => {
     const carol = await open('Carol');
     await same(ann, carol, 'late join');

@@ -4,7 +4,7 @@ export const H = 900;
 export const MAX_POINTS = 40_000; // numbers (x,y pairs => 20k points) per stroke
 export const MAX_CHUNK = 2_000;
 
-const TOOLS = new Set(['pen', 'eraser', 'line', 'spray']);
+const TOOLS = new Set(['pen', 'pencil', 'marker', 'highlighter', 'crayon', 'eraser', 'line', 'spray']);
 const CAPS = new Set(['round', 'square', 'butt']);
 const ID_RE = /^[A-Za-z0-9_-]{6,40}$/;
 const COLOR_RE = /^#[0-9a-fA-F]{6}$/;

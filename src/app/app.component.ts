@@ -18,8 +18,9 @@ export class AppComponent implements OnInit, OnDestroy {
     // Connect when we have a session, disconnect when we don't.
     if (this.auth.token) this.board.connect();
     this.sub = this.auth.tokenChanged.subscribe((token) => {
+      // A new token (sign-in or a name change): reconnect so everyone sees the current name.
+      this.board.disconnect();
       if (token) this.board.connect();
-      else this.board.disconnect();
     });
   }
 

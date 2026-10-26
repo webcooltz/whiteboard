@@ -1,4 +1,4 @@
-import { drawStroke } from './renderer';
+import { drawStroke, drawWhole, isWhole, paintPoints, paintTail } from './renderer';
 import type { Stroke } from './stroke';
 
 interface Cursor { x: number; y: number; t: number; }
@@ -6,8 +6,8 @@ export interface LocalCursor { x: number; y: number; down: boolean; }
 
 /**
  * Holds the strokes on the board and paints them. Two canvases:
- *  - main: committed strokes (and growing pen/eraser/spray strokes, painted incrementally)
- *  - overlay: things that are not final yet — line previews, other people's cursors
+ *  - main: committed strokes (and growing point-by-point strokes, painted incrementally)
+ *  - overlay: things that are not final yet — line/marker/highlighter previews, other people's cursors
  */
 export class BoardView {
   main: CanvasRenderingContext2D;
@@ -55,7 +55,8 @@ export class BoardView {
     this.active.delete(id);
     this.drawn.delete(id);
     this.committed.push(s);
-    if (s.tool === 'line') { drawStroke(this.main, s); this.redrawOverlay(); }
+    if (isWhole(s)) { drawWhole(this.main, s); this.redrawOverlay(); }
+    else paintTail(this.main, s);
   }
 
   remove(id: string): void {
@@ -66,9 +67,8 @@ export class BoardView {
   }
 
   private paintActive(s: Stroke): void {
-    if (s.tool === 'line') { this.redrawOverlay(); return; }
-    const from = this.drawn.get(s.id) ?? 0;
-    drawStroke(this.main, s, from);
+    if (isWhole(s)) { this.redrawOverlay(); return; }
+    paintPoints(this.main, s, this.drawn.get(s.id) ?? 0);
     this.drawn.set(s.id, s.p.length / 2);
   }
 
@@ -76,7 +76,7 @@ export class BoardView {
     this.main.clearRect(0, 0, this.w, this.h);
     for (const s of this.committed) drawStroke(this.main, s);
     for (const s of this.active.values()) {
-      if (s.tool !== 'line') drawStroke(this.main, s);
+      if (!isWhole(s)) paintPoints(this.main, s, 0);
       this.drawn.set(s.id, s.p.length / 2);
     }
     this.redrawOverlay();
@@ -101,7 +101,7 @@ export class BoardView {
   redrawOverlay(): void {
     const o = this.overlay;
     o.clearRect(0, 0, this.w, this.h);
-    for (const s of this.active.values()) if (s.tool === 'line') drawStroke(o, s);
+    for (const s of this.active.values()) if (isWhole(s)) drawWhole(o, s);
     o.save();
     o.font = '22px sans-serif';
     for (const [user, c] of this.cursors) {

@@ -43,3 +43,6 @@ Thumbs.db
 
 # Board server data (saved boards, audit log, secrets) — never commit
 /data
+
+# Local settings (contains the board password)
+/.env

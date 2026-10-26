@@ -11,13 +11,13 @@ export class PaletteService {
     tools: Palette.availableTools,
     userSelections: {
       tool: Palette.availableTools[0],
-      color: "#000000",
+      color: "#1f2937",
       secondaryColor: "#ffffff",
-      brushSize: 5,
+      brushSize: 6,
       brushShape: "round",
       sprayOptions: {
-        radius: 10,
-        density: 100
+        radius: 20,
+        density: 40
       }
     }
   };

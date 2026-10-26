@@ -1,110 +1,46 @@
-<!--Page title-->
-<div class="palette__title"><h2>Palette</h2></div>
-<!--Page container-->
-<div class="palette-container">
-  <!--Misc section-->
-  <div class="palette__box">
-    <!--Brush size-->
-    <div class="brush__size__container">
-      <div class="brush__size__item">
-        <label class="brush__size__label">Brush Size</label>
-        <input class="brush__size__input"
-          type="number"
-          min="1"
-          max="100"
-          [(ngModel)]="palette.userSelections.brushSize"
-          (ngModelChange)="updateBrushSize($event)">
-      </div>
-    </div>
-    <div class="brush__shape__container">
-      <div class="brush__size__item">
-        <ul>
-          <li>
-            <label class="brush__size__label">Round</label>
-            <input class="brush__shape__input"
-              type="radio"
-              name="brushShape"
-              value="round"
-              [(ngModel)]="palette.userSelections.brushShape"
-              (ngModelChange)="updateBrushShape($event)">
-          </li>
-          <li>
-            <label class="brush__size__label">Square</label>
-            <input class="brush__shape__input"
-              type="radio"
-              name="brushShape"
-              value="square"
-              [(ngModel)]="palette.userSelections.brushShape"
-              (ngModelChange)="updateBrushShape($event)">
-          </li>
-          <li>
-            <label class="brush__size__label">Butt</label>
-            <input class="brush__shape__input"
-              type="radio"
-              name="brushShape"
-              value="butt"
-              [(ngModel)]="palette.userSelections.brushShape"
-              (ngModelChange)="updateBrushShape($event)">
-          </li>
-        </ul>
-      </div>
-    </div>
+<section>
+  <h3>Tools</h3>
+  <div class="tiles" role="radiogroup" aria-label="Tool">
+    <button *ngFor="let tool of palette.tools; let i = index" type="button" class="tile" role="radio"
+      [class.on]="tool === sel.tool" [attr.aria-checked]="tool === sel.tool" (click)="selectTool(tool)"
+      [title]="tool.description + ' (' + (i + 1) + ')'">
+      <canvas #preview *ngIf="tool.name !== 'Eraser'; else icon" width="112" height="48" aria-hidden="true"></canvas>
+      <ng-template #icon><i [class]="tool.icon" aria-hidden="true"></i></ng-template>
+      <span>{{ tool.name }}</span>
+    </button>
   </div>
-  <!--Color section-->
-  <div class="palette__box">
-    <input [(colorPicker)]="palette.userSelections.color" [style.background]="palette.userSelections.color" (colorPickerChange)="onColorChange($event)" class="color-swatch"/>
+  <div class="seg" *ngIf="sel.tool.options.length > 1" role="radiogroup" aria-label="Line style">
+    <button *ngFor="let o of sel.tool.options" type="button" role="radio" [class.on]="o === sel.tool.selectedOption"
+      [attr.aria-checked]="o === sel.tool.selectedOption" (click)="selectToolOption(o)">{{ o.description }}</button>
   </div>
-  <!--Tool section-->
-  <div class="palette__box">
-    <!--tool outline-->
-    <div class="palette__outline"
-      *ngFor="let tool of palette.tools"
-      [ngStyle]="{'border': tool === palette.userSelections.tool ? '2px solid blue' : 'none'}">
-      <!--tool box-->
-      <div class="palette__item"
-        #toolItem
-        (click)="selectTool(tool)">
-        {{ tool.name }}
-        <i [class]="tool.icon"></i>
-        <!--tool options-->
-        <div id="tool-options"
-          *ngIf="palette.userSelections.tool.contextMenuVisible">
-          <div
-            #toolOptionItem
-            id="tool-options-item"
-            *ngFor="let toolOption of palette.userSelections.tool.options"
-            [ngStyle]="{'border': toolOption === palette.userSelections.tool.selectedOption && tool.name === palette.userSelections.tool.name &&  palette.userSelections.tool.options.length > 1 ? '2px solid blue' : 'none'}">
-            <div
-              id="tool-options-item__text"
-              *ngIf="tool.name === palette.userSelections.tool.name && palette.userSelections.tool.options.length > 1"
-              (click)="selectToolOption(toolOption)">
-              {{ toolOption.name }}
-            </div>
-          </div>
-          <!--Spraypaint options-->
-          <div class="spraypaint__options"
-            *ngIf="tool.name.toLowerCase() === 'spraypaint'">
-            <div class="brush__size__item">
-              <label class="brush__size__label">Spray Radius (Size)</label>
-              <input class="brush__size__input"
-                type="number"
-                min="1"
-                max="100"
-                [(ngModel)]="palette.userSelections.sprayOptions.radius"
-                (ngModelChange)="updateSprayRadius($event)">
-            </div>
-            <div class="brush__size__item">
-              <label class="brush__size__label">Spray Density</label>
-              <input class="brush__size__input"
-                type="number"
-                min="1"
-                max="100"
-                [(ngModel)]="palette.userSelections.sprayOptions.density"
-                (ngModelChange)="updateSprayDensity($event)">
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+</section>
+
+<section *ngIf="sel.tool.name !== 'Eraser'">
+  <h3>Color</h3>
+  <div class="swatches" role="radiogroup" aria-label="Color">
+    <button *ngFor="let c of swatches" type="button" class="swatch" role="radio" [style.background]="c" [class.light]="c === '#ffffff'"
+      [class.on]="c === sel.color" [attr.aria-checked]="c === sel.color" [attr.aria-label]="c" (click)="setColor(c)"></button>
+    <button type="button" class="swatch custom" [class.on]="!isPreset" title="Custom color" aria-label="Custom color"
+      [style.background]="isPreset ? null : sel.color"
+      [colorPicker]="sel.color" (colorPickerChange)="setColor($event)" cpOutputFormat="hex" cpAlphaChannel="disabled"
+      [cpUseRootViewContainer]="true" cpPosition="bottom"><i class="fas fa-eye-dropper" *ngIf="isPreset"></i></button>
   </div>
-</div>
+</section>
+
+<section>
+  <h3>{{ isSpray ? 'Spray width' : 'Size' }}</h3>
+  <div class="size">
+    <span class="dotbox"><span class="sizedot" [style.width.px]="dotPx" [style.height.px]="dotPx"
+      [style.background]="sel.tool.name === 'Eraser' ? '#d1d5db' : sel.color"></span></span>
+    <input type="range" min="1" [max]="isSpray ? 60 : 40" [ngModel]="isSpray ? sel.sprayOptions.radius : sel.brushSize"
+      (ngModelChange)="setSize(+$event)" aria-label="Size">
+    <output>{{ isSpray ? sel.sprayOptions.radius : sel.brushSize }}</output>
+  </div>
+  <div class="size" *ngIf="isSpray">
+    <span class="dotbox"><i class="fas fa-braille"></i></span>
+    <input type="range" min="5" max="100" [ngModel]="sel.sprayOptions.density" (ngModelChange)="updateSprayDensity(+$event)" aria-label="Spray density">
+    <output>{{ sel.sprayOptions.density }}</output>
+  </div>
+</section>
+
+<p class="keys"><kbd>1</kbd>–<kbd>8</kbd> tools &nbsp;<kbd>[</kbd> <kbd>]</kbd> size<br><kbd>Ctrl</kbd>+<kbd>Z</kbd> undo</p>
