@@ -25,6 +25,7 @@ window.start = async (name) => {
     else if (m.t === 'begin') view.begin(m);
     else if (m.t === 'pts') view.pts(m.id, m.p);
     else if (m.t === 'end') view.end(m.id);
+    else if (m.t === 'put') view.put(m.s);
     else if (m.t === 'remove') view.remove(m.id);
     else if (m.t === 'reset') view.reset(m.strokes);
     else if (m.t === 'cur') view.setCursor(m.user, m.x, m.y);

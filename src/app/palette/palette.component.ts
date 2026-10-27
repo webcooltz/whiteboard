@@ -10,6 +10,8 @@ import { drawStroke } from '../board/renderer';
 import { toolStateFrom } from '../board/tool-state';
 
 const NO_PREVIEW = new Set(['Eraser', 'Text', 'Sticker']); // these tiles show an icon instead of a sample stroke
+// Text box backgrounds: sticky-note tints plus white and dark ('' = none).
+const TEXT_BGS = ['#fef08a', '#fed7aa', '#fbcfe8', '#e9d5ff', '#bfdbfe', '#bbf7d0', '#ffffff', '#1f2937'];
 const SWATCHES = ['#1f2937', '#ffffff', '#9ca3af', '#ef4444', '#f97316', '#facc15', '#22c55e', '#3b82f6', '#6366f1', '#a855f7', '#ec4899'];
 
 @Component({
@@ -21,6 +23,7 @@ export class PaletteComponent implements OnInit, AfterViewInit, OnDestroy {
   palette!: Palette;
   paletteChangeSub!: Subscription;
   swatches = SWATCHES;
+  textBgs = TEXT_BGS;
   @ViewChildren('preview') previews!: QueryList<ElementRef<HTMLCanvasElement>>;
   private previewSub?: Subscription;
 
@@ -56,6 +59,12 @@ export class PaletteComponent implements OnInit, AfterViewInit, OnDestroy {
     this.previewSub?.unsubscribe();
   }
 
+  // Tapping a palette button while typing a text box would take focus from the text field; keep it there.
+  @HostListener('mousedown', ['$event'])
+  keepTextFocus(e: MouseEvent): void {
+    if (document.activeElement?.classList.contains('text-field') && (e.target as HTMLElement).closest('button')) e.preventDefault();
+  }
+
   @HostListener('document:keydown', ['$event'])
   onKey(e: KeyboardEvent): void {
     const t = e.target as HTMLElement | null;
@@ -85,6 +94,11 @@ export class PaletteComponent implements OnInit, AfterViewInit, OnDestroy {
   setColor(color: string): void {
     if (!/^#[0-9a-fA-F]{6}$/.test(color)) return;
     this.sel.color = color.toLowerCase();
+    this.paletteService.setPalette(this.palette);
+  }
+
+  setTextBg(bg: string): void {
+    this.sel.textBg = bg;
     this.paletteService.setPalette(this.palette);
   }
 

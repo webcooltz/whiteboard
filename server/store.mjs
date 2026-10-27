@@ -27,6 +27,7 @@ export class Store {
       try { op = JSON.parse(line); } catch { continue; } // torn final write after a crash
       this.ops++;
       if (op.o === 'add' && op.s && !byId.has(op.s.id)) { this.strokes.push(op.s); byId.set(op.s.id, op.s); }
+      else if (op.o === 'put' && op.s && byId.has(op.s.id)) { const i = this.strokes.indexOf(byId.get(op.s.id)); this.strokes[i] = op.s; byId.set(op.s.id, op.s); }
       else if (op.o === 'rm') { if (byId.delete(op.id)) this.strokes = this.strokes.filter((s) => s.id !== op.id); }
       else if (op.o === 'set' && Array.isArray(op.strokes)) reset(op.strokes);
     }
@@ -49,6 +50,17 @@ export class Store {
   has(id) { return this.ids.has(id); }
 
   add(stroke) { this.strokes.push(stroke); this.ids.add(stroke.id); this.#append({ o: 'add', s: stroke }); }
+
+  get(id) { return this.ids.has(id) ? this.strokes.find((s) => s.id === id) : null; }
+
+  // Swap a stroke for a new version of itself, keeping its place in the drawing order.
+  replace(stroke) {
+    const i = this.strokes.findIndex((s) => s.id === stroke.id);
+    if (i < 0) return false;
+    this.strokes[i] = stroke;
+    this.#append({ o: 'put', s: stroke });
+    return true;
+  }
 
   remove(id) {
     const i = this.strokes.findIndex((s) => s.id === id);

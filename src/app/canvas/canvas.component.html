@@ -6,10 +6,12 @@
         aria-label="Shared whiteboard. Arrow keys move the cursor, Space starts and stops drawing or places text and stickers, Escape stops, Control+Z undoes, Control+Y redoes."></canvas>
       <canvas #overlay class="layer overlay" width="1600" height="900" aria-hidden="true"></canvas>
       <textarea #textField *ngIf="editor" class="text-field" [(ngModel)]="editorText" maxlength="500"
-        [style.left.%]="editor.x / 16" [style.top.%]="editor.y / 9" [style.color]="editor.color"
-        [style.font-size.px]="editorFontPx" [style.line-height]="lineHeight"
-        [attr.rows]="editorRows" [attr.cols]="editorCols" aria-label="Text box. Enter places it, Shift+Enter adds a line, Escape cancels."
-        placeholder="Type…" (keydown)="onTextKey($event)" (blur)="commitText()"></textarea>
+        [style.left.%]="editorLeft" [style.top.%]="editorTop" [style.color]="editorColor" [style.background]="editorBg"
+        [style.font-size.px]="editorFontPx" [style.line-height]="lineHeight" [style.padding.px]="editorPadPx"
+        [style.border-radius.px]="editorFontPx * 0.2"
+        [attr.rows]="editorRows" [attr.cols]="editorCols"
+        aria-label="Text box. Enter places it, Shift+Enter adds a line, Escape cancels. Clear it to delete the box."
+        placeholder="Type…" (keydown)="onTextKey($event)" (blur)="onTextBlur($event)"></textarea>
       <div class="banner" *ngIf="board.status !== 'online'" role="status">
         <i class="fas fa-wifi"></i>
         {{ board.status === 'connecting' ? 'Connecting…' : 'Offline — reconnecting. Drawing is paused.' }}

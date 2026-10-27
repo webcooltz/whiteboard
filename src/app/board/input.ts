@@ -179,7 +179,7 @@ export class InputController {
     if (!this.enabled || !this.net.online) return;
     const s: Stroke = {
       id: newStrokeId(), user: this.user, tool: t.tool, color: t.color, size: t.size, cap: t.cap,
-      dash: [], seed: 0, radius: t.radius, density: t.density, p: [round(x), round(y)], text,
+      dash: [], seed: 0, radius: t.radius, density: t.density, p: [round(x), round(y)], text, ...(t.bg ? { bg: t.bg } : {}),
     };
     this.board.begin(s);
     const { user, ...wire } = s;

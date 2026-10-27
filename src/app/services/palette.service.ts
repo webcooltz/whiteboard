@@ -18,7 +18,8 @@ export class PaletteService {
       sprayOptions: {
         radius: 20,
         density: 40
-      }
+      },
+      textBg: ''
     }
   };
 

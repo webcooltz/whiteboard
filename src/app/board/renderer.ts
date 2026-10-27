@@ -32,11 +32,34 @@ export const TEXT_FONT = "500 {size}px 'Inter', system-ui, 'Segoe UI', Roboto, s
 export const STICKER_FONT = "{size}px 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif";
 export const LINE_HEIGHT = 1.25;
 
-/** Text boxes: lines from the top-left point. Stickers: one emoji centered on the point. */
+/** Space between a text box's text and the edge of its background. */
+export const textPad = (size: number) => Math.round(size * 0.3);
+
+/** The area a text box covers, background padding included, in board coordinates. */
+export function textBox(ctx: CanvasRenderingContext2D, s: Stroke): { x: number; y: number; w: number; h: number } {
+  ctx.save();
+  ctx.font = TEXT_FONT.replace('{size}', String(s.size));
+  const lines = (s.text ?? '').split('\n');
+  const w = Math.max(...lines.map((l) => ctx.measureText(l).width));
+  ctx.restore();
+  const pad = textPad(s.size);
+  return { x: s.p[0] - pad, y: s.p[1] - pad, w: w + pad * 2, h: lines.length * s.size * LINE_HEIGHT + pad * 2 };
+}
+
+/** Text boxes: lines from the top-left point, on an optional background. Stickers: one emoji centered on the point. */
 function drawText(ctx: CanvasRenderingContext2D, s: Stroke): void {
+  const sticker = s.tool === 'sticker';
+  if (!sticker && s.bg) {
+    const b = textBox(ctx, s);
+    ctx.save();
+    ctx.fillStyle = s.bg;
+    ctx.beginPath();
+    ctx.roundRect(b.x, b.y, b.w, b.h, Math.round(s.size * 0.2));
+    ctx.fill();
+    ctx.restore();
+  }
   ctx.save();
   ctx.fillStyle = s.color;
-  const sticker = s.tool === 'sticker';
   ctx.font = (sticker ? STICKER_FONT : TEXT_FONT).replace('{size}', String(s.size));
   ctx.textAlign = sticker ? 'center' : 'left';
   ctx.textBaseline = sticker ? 'middle' : 'top';

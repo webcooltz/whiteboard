@@ -13,7 +13,7 @@
 .overlay { pointer-events: none; }
 /* Sits exactly where the text will be drawn (top-left at the click), same font and size. */
 .text-field {
-  position: absolute; z-index: 2; margin: 0; padding: 0; border: 0; outline: 1px dashed var(--accent); outline-offset: 4px;
+  position: absolute; z-index: 2; margin: 0; padding: 0; border: 0; box-sizing: content-box; outline: 1px dashed var(--accent); outline-offset: 2px;
   background: transparent; resize: none; overflow: hidden; white-space: pre; font-family: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
   font-weight: 500; min-width: 4ch; field-sizing: content;
 }

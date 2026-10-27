@@ -6,10 +6,12 @@ import { PaletteService } from '../services/palette.service';
 import { BoardView } from '../board/board-view';
 import { InputController } from '../board/input';
 import { BOARD_H, BOARD_W } from '../board/stroke';
-import { toolStateFrom } from '../board/tool-state';
-import { LINE_HEIGHT } from '../board/renderer';
+import { textSlider, toolStateFrom } from '../board/tool-state';
+import { LINE_HEIGHT, textPad } from '../board/renderer';
+import type { Stroke } from '../board/stroke';
 
-interface TextEditor { x: number; y: number; size: number; color: string; }
+/** A text box being typed: a new one at (x, y), or an existing one (orig) being changed. */
+interface TextEditor { x: number; y: number; orig: Stroke | null; slider: number; }
 
 @Component({
   selector: 'app-canvas',
@@ -33,6 +35,8 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
   private resizeObserver: ResizeObserver | null = null;
   private pruneTimer: any = null;
   private tokenSub?: Subscription;
+  private paletteSub?: Subscription;
+  private view: BoardView | null = null;
 
   constructor(
     public board: BoardService,
@@ -50,6 +54,9 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
       BOARD_H
     );
     this.board.attachView(view);
+    this.view = view;
+    // Switching away from the Text tool finishes the box being typed.
+    this.paletteSub = this.palette.paletteChanged.subscribe((p) => { if (this.editor && p.userSelections.tool.name !== 'Text') this.commitText(); });
 
     // Pointer/keyboard handlers fire constantly; keep them out of Angular's change detection.
     this.zone.runOutsideAngular(() => {
@@ -88,40 +95,89 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
     document.fonts?.ready.then(() => view.redrawAll());
   }
 
-  get editorFontPx(): number { return this.editor ? this.editor.size * this.scale : 16; }
+  // The field shows the Text tool's current color, size and background, so the palette restyles it while typing.
+  private get style() { return toolStateFrom(this.palette.getPalette().userSelections); }
+  private get size(): number {
+    const ed = this.editor;
+    // An existing box keeps its exact size unless the slider is moved.
+    return ed?.orig && this.palette.getPalette().userSelections.brushSize === ed.slider ? ed.orig.size : this.style.size;
+  }
+  get editorColor(): string { return this.style.color; }
+  get editorBg(): string { return this.style.bg ?? 'transparent'; }
+  get editorFontPx(): number { return this.size * this.scale; }
+  get editorPadPx(): number { return textPad(this.size) * this.scale; }
+  get editorLeft(): number { return this.editor ? ((this.editor.x - textPad(this.size)) / BOARD_W) * 100 : 0; }
+  get editorTop(): number { return this.editor ? ((this.editor.y - textPad(this.size)) / BOARD_H) * 100 : 0; }
   // Grow the field with its text (for browsers without CSS field-sizing).
   get editorRows(): number { return this.editorText.split('\n').length; }
   get editorCols(): number { return Math.max(4, ...this.editorText.split('\n').map((l) => l.length + 1)); }
 
+  /** The Text tool was used at (x, y): change the text box there, or start a new one. */
   private openEditor(x: number, y: number): void {
-    if (this.editor) this.commitText(); // clicking elsewhere finishes the box being typed
-    const t = toolStateFrom(this.palette.getPalette().userSelections);
-    this.editor = { x, y, size: t.size, color: t.color };
-    this.editorText = '';
-    setTimeout(() => this.textFieldRef?.nativeElement.focus());
+    if (this.editor) { this.commitText(); return; } // a click outside the field just finishes it
+    const sel = this.palette.getPalette().userSelections;
+    const orig = this.view?.textAt(x, y) ?? null;
+    if (orig) {
+      // Load the box's look into the palette so the color, size and background controls change it.
+      sel.color = orig.color;
+      sel.brushSize = textSlider(orig.size);
+      sel.textBg = orig.bg ?? '';
+      this.palette.setPalette(this.palette.getPalette());
+      this.view?.hide(orig.id);
+    }
+    this.editor = orig ? { x: orig.p[0], y: orig.p[1], orig, slider: sel.brushSize } : { x, y, orig: null, slider: sel.brushSize };
+    this.editorText = orig?.text ?? '';
+    setTimeout(() => {
+      const f = this.textFieldRef?.nativeElement;
+      f?.focus();
+      f?.setSelectionRange(f.value.length, f.value.length);
+    });
   }
 
   onTextKey(e: KeyboardEvent): void {
     if (e.key !== 'Escape' && (e.key !== 'Enter' || e.shiftKey)) return;
     e.preventDefault();
-    if (e.key === 'Escape') this.editorText = '';
-    this.commitText();
+    if (e.key === 'Escape') this.cancelText();
+    else this.commitText();
     this.canvasRef.nativeElement.focus({ preventScroll: true }); // keyboard users carry on from the board
+  }
 
+  /** Leaving the field finishes it, except for the palette: that is how you restyle the text. */
+  onTextBlur(e: FocusEvent): void {
+    const to = e.relatedTarget as HTMLElement | null;
+    if (to?.closest('app-palette')) return;
+    this.commitText();
   }
 
   commitText(): void {
     const ed = this.editor;
     if (!ed) return;
-    const text = this.editorText;
+    const text = this.editorText.slice(0, 500);
+    const { color, bg } = this.style;
+    const size = this.size;
     this.editor = null;
     this.editorText = '';
-    if (text.trim()) this.input?.placeText(ed.x, ed.y, text.slice(0, 500));
+    this.view?.hide(null);
+    if (!ed.orig) {
+      if (text.trim()) this.input?.placeText(ed.x, ed.y, text);
+      return;
+    }
+    const o = ed.orig;
+    if (text === o.text && color === o.color && size === o.size && (bg ?? null) === (o.bg ?? null)) return;
+    const { bg: _old, ...rest } = o;
+    this.board.editText({ ...rest, text, color, size, ...(bg ? { bg } : {}) });
+  }
+
+  private cancelText(): void {
+    this.editor = null;
+    this.editorText = '';
+    this.view?.hide(null);
   }
 
   ngOnDestroy(): void {
     clearInterval(this.pruneTimer);
     this.tokenSub?.unsubscribe();
+    this.paletteSub?.unsubscribe();
     this.resizeObserver?.disconnect();
     this.input?.destroy();
     this.board.detachView();

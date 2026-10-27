@@ -15,6 +15,7 @@ export interface Stroke {
   density: number;
   p: number[]; // flat [x0, y0, x1, y1, ...] in board coordinates (default 1600x900)
   text?: string; // text boxes (top-left at p) and stickers (centered on p); size is the font size
+  bg?: string; // text box background color (none when missing)
 }
 
 export const BOARD_W = 1600;

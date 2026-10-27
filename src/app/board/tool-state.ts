@@ -9,6 +9,7 @@ export interface ToolState {
   radius: number;
   density: number;
   text?: string; // the sticker to place
+  bg?: string; // text box background (none when missing)
 }
 
 // The bits of the palette model we read. Declared structurally so this file needs no imports.
@@ -18,12 +19,17 @@ export interface SelectionsLike {
   brushSize: number;
   brushShape: string;
   sprayOptions: { radius: number; density: number };
+  textBg?: string; // '' = no background
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, Number.isFinite(v) ? v : lo));
 
 // Brush names (and the older pen sub-options marker / pencil / crayon) -> the stroke kind they draw.
 const BRUSHES: Record<string, ToolKind> = { pen: 'pen', pencil: 'pencil', marker: 'marker', highlighter: 'highlighter', crayon: 'crayon' };
+
+/** Size slider (1-40) -> text box font size, and back. */
+export const textSize = (slider: number) => clamp(12 + slider * 4, 12, 172);
+export const textSlider = (size: number) => clamp(Math.round((size - 12) / 4), 1, 40);
 
 export function toolStateFrom(sel: SelectionsLike): ToolState {
   const name = sel.tool.name.toLowerCase();
@@ -36,7 +42,10 @@ export function toolStateFrom(sel: SelectionsLike): ToolState {
     density: clamp(Math.round(sel.sprayOptions.density), 1, 200),
   };
   // Size slider 1-40 -> font size in board pixels.
-  if (name === 'text') return { ...base, tool: 'text', size: clamp(12 + size * 4, 12, 172), cap: 'round', dash: [] };
+  if (name === 'text') {
+    const bg = sel.textBg && /^#[0-9a-fA-F]{6}$/.test(sel.textBg) ? sel.textBg : undefined;
+    return { ...base, tool: 'text', size: textSize(size), cap: 'round', dash: [], ...(bg ? { bg } : {}) };
+  }
   if (name === 'sticker') return { ...base, tool: 'sticker', size: clamp(32 + size * 8, 32, 200), cap: 'round', dash: [], text: sel.tool.selectedOption.name };
   if (name === 'eraser') return { ...base, tool: 'eraser', size: clamp(size * 2, 1, 200), cap: 'round', dash: [] };
   if (name === 'spray' || name === 'spraypaint') return { ...base, tool: 'spray', size, cap, dash: [] };

@@ -192,6 +192,40 @@ test('text boxes and stickers sync, keep their text, and undo like strokes', asy
   ann.close(); bob.close();
 });
 
+test('anyone can edit a text box; undo and redo step through edits; empty text deletes it', async () => {
+  const ann = await connect('Ann');
+  const bob = await connect('Bob');
+  ann.send(stroke('editbox01', { tool: 'text', size: 32, p: [100, 120], text: 'first' }));
+  ann.send({ t: 'end', id: 'editbox01' });
+  ann.send(stroke('editother', { p: [5, 5] })); ann.send({ t: 'end', id: 'editother' }); // drawn after the box
+  await bob.wait((m) => m.t === 'end' && m.id === 'editother');
+
+  bob.send({ t: 'edit', id: 'editbox01', text: 'second', color: '#0000ff', size: 40, bg: '#fef08a' });
+  const put = (await ann.wait((m) => m.t === 'put' && m.s.text === 'second')).s;
+  assert.deepEqual([put.color, put.size, put.bg, put.user, put.p], ['#0000ff', 40, '#fef08a', 'Ann', [100, 120]]);
+  assert.equal(app.store.strokes.findIndex((s) => s.id === 'editbox01'), app.store.strokes.length - 2, 'keeps its place');
+
+  bob.send({ t: 'undo' }); // Bob's last action was the edit, not a stroke
+  assert.equal((await ann.wait((m) => m.t === 'put' && m.s.text === 'first')).s.bg, undefined);
+  bob.send({ t: 'redo' });
+  await ann.wait((m) => m.t === 'put' && m.s.text === 'second' && m.s !== put);
+  assert.equal(app.store.get('editbox01').bg, '#fef08a');
+
+  bob.send({ t: 'edit', id: 'editbox01', text: '  ' });
+  await ann.wait((m) => m.t === 'remove' && m.id === 'editbox01');
+  bob.send({ t: 'undo' });
+  await ann.wait((m) => m.t === 'put' && m.s.id === 'editbox01' && m.s.text === 'second');
+
+  for (const bad of [{ id: 'editother', text: 'x', color: '#000000', size: 20 }, { id: 'editbox01', text: 'x', color: 'red', size: 20 },
+    { id: 'editbox01', text: 'x', color: '#000000', size: 20, bg: 'blue' }, { id: 'nosuchbox1', text: 'x', color: '#000000', size: 20 }]) {
+    bob.send({ t: 'edit', ...bad });
+  }
+  await sleep(150);
+  assert.equal(bob.msgs.filter((m) => m.t === 'error').length, 4);
+  assert.equal(app.store.get('editbox01').text, 'second');
+  ann.close(); bob.close();
+});
+
 test('undo removes only your own last stroke', async () => {
   const ann = await connect('Ann');
   const bob = await connect('Bob');
@@ -220,10 +254,10 @@ test('redo restores your own undone strokes, and drawing again ends the redo cha
   assert.ok(!app.store.has('annredo01') && !app.store.has('annredo02'));
 
   ann.send({ t: 'redo' });
-  const b = await bob.wait((m) => m.t === 'begin' && m.id === 'annredo01');
+  const b = (await bob.wait((m) => m.t === 'put' && m.s.id === 'annredo01')).s;
   assert.equal(b.user, 'Ann');
   assert.ok(b.p.length > 0, 'redo sends the whole stroke');
-  await ann.wait((m) => m.t === 'end' && m.id === 'annredo01');
+  await ann.wait((m) => m.t === 'put' && m.s.id === 'annredo01');
   assert.ok(app.store.has('annredo01'));
 
   ann.send(stroke('annredo03')); ann.send({ t: 'end', id: 'annredo03' });
@@ -309,7 +343,7 @@ test('renaming keeps you the same person: no reconnect, and undo/redo still reac
   cara.send({ t: 'undo' });
   assert.equal((await bob.wait((m) => m.t === 'remove' && m.id === 'carastroke1')).by, 'Carla');
   cara.send({ t: 'redo' });
-  await bob.wait((m) => m.t === 'begin' && m.id === 'carastroke1');
+  await bob.wait((m) => m.t === 'put' && m.s.id === 'carastroke1');
 
   // A token for someone else's sign-in can't take over this connection.
   const other = (await login({ name: 'Mallory', password: 'correct horse' })).body.token;

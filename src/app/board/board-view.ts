@@ -1,4 +1,4 @@
-import { drawStroke, drawWhole, isWhole, paintPoints, paintTail } from './renderer';
+import { drawStroke, drawWhole, isWhole, paintPoints, paintTail, textBox } from './renderer';
 import type { Stroke } from './stroke';
 
 interface Cursor { x: number; y: number; t: number; }
@@ -19,6 +19,8 @@ export class BoardView {
   cursors = new Map<string, Cursor>();
   localCursor: LocalCursor | null = null;
   private drawn = new Map<string, number>(); // active stroke id -> points already painted
+  /** A text box being edited: left off the canvas while its text field is open over it. */
+  private hidden: string | null = null;
 
   constructor(main: CanvasRenderingContext2D, overlay: CanvasRenderingContext2D, w: number, h: number) {
     this.main = main;
@@ -59,6 +61,33 @@ export class BoardView {
     else paintTail(this.main, s);
   }
 
+  /** A new version of a stroke (an edited text box, or one brought back by undo/redo). */
+  put(s: Stroke): void {
+    const i = this.committed.findIndex((c) => c.id === s.id);
+    if (i >= 0) this.committed[i] = s;
+    else this.committed.push(s);
+    this.redrawAll();
+  }
+
+  has(id: string): boolean { return this.committed.some((s) => s.id === id); }
+
+  /** The topmost text box at (x, y), if any. */
+  textAt(x: number, y: number): Stroke | null {
+    for (let i = this.committed.length - 1; i >= 0; i--) {
+      const s = this.committed[i];
+      if (s.tool !== 'text') continue;
+      const b = textBox(this.main, s);
+      if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) return s;
+    }
+    return null;
+  }
+
+  hide(id: string | null): void {
+    if (this.hidden === id) return;
+    this.hidden = id;
+    this.redrawAll();
+  }
+
   remove(id: string): void {
     const i = this.committed.findIndex((s) => s.id === id);
     if (i < 0) return;
@@ -74,7 +103,7 @@ export class BoardView {
 
   redrawAll(): void {
     this.main.clearRect(0, 0, this.w, this.h);
-    for (const s of this.committed) drawStroke(this.main, s);
+    for (const s of this.committed) if (s.id !== this.hidden) drawStroke(this.main, s);
     for (const s of this.active.values()) {
       if (!isWhole(s)) paintPoints(this.main, s, 0);
       this.drawn.set(s.id, s.p.length / 2);

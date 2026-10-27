@@ -1,10 +1,10 @@
 // The live board: one shared canvas, many connected clients.
 import { verifyToken } from './auth.mjs';
-import { W, H, MAX_POINTS, cleanBegin, cleanPoints, cleanSnapshotName } from './validate.mjs';
+import { W, H, MAX_POINTS, cleanBegin, cleanEdit, cleanPoints, cleanSnapshotName } from './validate.mjs';
 
 const MAX_STROKES = 100_000;
 const MAX_OPEN_PER_CLIENT = 4;
-const MAX_REDO = 100;
+const MAX_HISTORY = 100;
 
 const stamp = () => new Date().toISOString().slice(0, 19).replace('T', ' ').replace(/:/g, '-');
 
@@ -15,7 +15,10 @@ export class Hub {
     this.secret = secret;
     this.maxClients = maxClients;
     this.clients = new Set();
-    this.redo = new Map(); // identity -> strokes they undid, most recent last
+    // Per identity, most recent last: what they did (undo walks back through it) and what they undid (redo).
+    // Actions: { k: 'add', s } | { k: 'edit', before, after } | { k: 'del', before }
+    this.history = new Map();
+    this.redo = new Map();
   }
 
   attach(ws, ip) {
@@ -47,6 +50,7 @@ export class Hub {
   }
   #resetAll(by, strokes) {
     for (const c of this.clients) c.open.clear();
+    this.history.clear();
     this.redo.clear();
     this.#broadcast({ t: 'reset', by, strokes });
   }
@@ -72,7 +76,7 @@ export class Hub {
   #commit(c, s) {
     if (!this.store.has(s.id) && this.store.strokes.length < MAX_STROKES) {
       this.store.add(s);
-      this.redo.delete(c.uid); // drawing something new ends the redo chain
+      this.#did(c, { k: 'add', s });
       this.audit.log('stroke', c.user, { id: s.id, tool: s.tool, points: s.p.length / 2 });
     }
     this.#broadcast({ t: 'end', id: s.id }, c);
@@ -110,6 +114,7 @@ export class Hub {
       case 'undo': return this.#undo(c);
       case 'redo': return this.#redo(c);
       case 'rename': return this.#rename(c, m);
+      case 'edit': return this.#edit(c, m);
       case 'clear': return this.#clear(c);
       case 'save': return this.#save(c, m);
       case 'load': return this.#load(c, m);
@@ -159,25 +164,86 @@ export class Hub {
     this.#commit(c, s);
   }
 
+  // Record something this person did. Doing something new ends their redo chain.
+  #did(c, action) {
+    const stack = this.history.get(c.uid) ?? [];
+    stack.push(action);
+    if (stack.length > MAX_HISTORY) stack.shift();
+    this.history.set(c.uid, stack);
+    this.redo.delete(c.uid);
+  }
+
+  // Undo (back = true) or redo an action. Returns the stroke id it changed, or null if the board has
+  // moved on (someone else changed or removed that stroke since), in which case it is skipped.
+  #apply(c, a, back) {
+    const st = this.store;
+    const from = back ? a.after : a.before, to = back ? a.before : a.after;
+    if (a.k === 'add' || a.k === 'del') {
+      const s = a.k === 'add' ? a.s : a.before;
+      const removing = (a.k === 'add') === back;
+      if (removing) {
+        if (!st.has(s.id)) return null;
+        st.remove(s.id);
+        this.#broadcast({ t: 'remove', id: s.id, by: c.user });
+      } else {
+        if (st.has(s.id) || st.strokes.length >= MAX_STROKES) return null;
+        st.add(s);
+        this.#broadcast({ t: 'put', s });
+      }
+      return s.id;
+    }
+    if (st.get(from.id) !== from) return null;
+    st.replace(to);
+    this.#broadcast({ t: 'put', s: to });
+    return to.id;
+  }
+
   #undo(c) {
-    const s = this.store.lastBy(c.uid, c.user);
-    if (!s) return;
-    this.store.remove(s.id);
-    const stack = this.redo.get(c.uid) ?? [];
-    stack.push(s);
-    if (stack.length > MAX_REDO) stack.shift();
-    this.redo.set(c.uid, stack);
-    this.audit.log('undo', c.user, { id: s.id });
-    this.#broadcast({ t: 'remove', id: s.id, by: c.user });
+    const stack = this.history.get(c.uid) ?? [];
+    let a, id = null;
+    while (!id && (a = stack.pop())) id = this.#apply(c, a, true);
+    if (!id) {
+      // Nothing recorded (e.g. after a server restart): fall back to their newest stroke on the board.
+      const s = this.store.lastBy(c.uid, c.user);
+      if (!s) return;
+      a = { k: 'add', s };
+      id = this.#apply(c, a, true);
+    }
+    const redo = this.redo.get(c.uid) ?? [];
+    redo.push(a);
+    if (redo.length > MAX_HISTORY) redo.shift();
+    this.redo.set(c.uid, redo);
+    this.audit.log('undo', c.user, { id });
   }
 
   #redo(c) {
-    const s = this.redo.get(c.uid)?.pop();
-    if (!s || this.store.has(s.id) || this.store.strokes.length >= MAX_STROKES) return;
-    this.store.add(s);
-    this.audit.log('redo', c.user, { id: s.id });
-    this.#broadcast({ t: 'begin', ...s });
-    this.#broadcast({ t: 'end', id: s.id });
+    const stack = this.redo.get(c.uid) ?? [];
+    let a, id = null;
+    while (!id && (a = stack.pop())) id = this.#apply(c, a, false);
+    if (!id) return;
+    const hist = this.history.get(c.uid) ?? [];
+    hist.push(a);
+    this.history.set(c.uid, hist);
+    this.audit.log('redo', c.user, { id });
+  }
+
+  // Anyone can change a text box: its text (empty text deletes it), color, size and background.
+  #edit(c, m) {
+    const e = cleanEdit(m);
+    const before = e && this.store.get(e.id);
+    if (!before || before.tool !== 'text') return this.#send(c, { t: 'error', msg: 'Could not change that text box' });
+    if (!e.text) {
+      this.store.remove(before.id);
+      this.#did(c, { k: 'del', before });
+      this.audit.log('edit', c.user, { id: before.id, deleted: true });
+      return this.#broadcast({ t: 'remove', id: before.id, by: c.user });
+    }
+    const { bg, ...rest } = before;
+    const after = { ...rest, text: e.text, color: e.color, size: e.size, ...(e.bg ? { bg: e.bg } : {}) };
+    this.store.replace(after);
+    this.#did(c, { k: 'edit', before, after });
+    this.audit.log('edit', c.user, { id: before.id });
+    this.#broadcast({ t: 'put', s: after });
   }
 
   // The client got a new token from /api/rename (which audits it); switch names without reconnecting.

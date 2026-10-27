@@ -45,7 +45,27 @@ export function cleanBegin(m) {
   // Text boxes and stickers are placed at one point and carry their text.
   const text = cleanText(m.text, m.tool === 'sticker' ? MAX_STICKER : MAX_TEXT);
   if (!text || p.length !== 2 || (m.tool === 'sticker' && text.includes('\n'))) return null;
-  return { ...h, text };
+  if (m.tool === 'sticker') return { ...h, text };
+  const bg = cleanBg(m.bg);
+  if (bg === false) return null;
+  return bg ? { ...h, text, bg } : { ...h, text };
+}
+
+// A text box's background: a color, or none (null). false means invalid.
+function cleanBg(v) {
+  if (v === undefined || v === null || v === '') return null;
+  return typeof v === 'string' && COLOR_RE.test(v) ? v : false;
+}
+
+// An edit to an existing text box: new text (empty = delete the box), color, size and background.
+export function cleanEdit(m) {
+  if (!m || typeof m.id !== 'string' || !ID_RE.test(m.id)) return null;
+  if (typeof m.text === 'string' && !m.text.trim()) return { id: m.id, text: '' };
+  if (typeof m.color !== 'string' || !COLOR_RE.test(m.color) || !num(m.size, 1, 200)) return null;
+  const bg = cleanBg(m.bg);
+  if (bg === false) return null;
+  const text = cleanText(m.text, MAX_TEXT);
+  return text ? { id: m.id, text, color: m.color, size: m.size, bg } : null;
 }
 
 export function cleanText(v, max) {

@@ -8,6 +8,7 @@ export class UserSelections {
   public brushSize: number; // 1 - 10
   public brushShape: string;
   public sprayOptions: SprayOptions;
+  public textBg?: string; // text box background; '' or missing = none
 
   constructor(tool: Tool, color: string, secondaryColor: string, brushSize: number, brushShape: string, sprayOptions: SprayOptions) {
     this.tool = tool;

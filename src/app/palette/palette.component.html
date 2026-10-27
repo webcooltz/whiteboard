@@ -38,10 +38,21 @@
   </div>
 </section>
 
+<section *ngIf="isText">
+  <h3>Background</h3>
+  <div class="swatches" role="radiogroup" aria-label="Text background">
+    <button type="button" class="swatch none" role="radio" [class.on]="!sel.textBg" [attr.aria-checked]="!sel.textBg"
+      aria-label="No background" title="No background" (click)="setTextBg('')"></button>
+    <button *ngFor="let c of textBgs" type="button" class="swatch" role="radio" [style.background]="c" [class.light]="c === '#ffffff'"
+      [class.on]="c === sel.textBg" [attr.aria-checked]="c === sel.textBg" [attr.aria-label]="c" (click)="setTextBg(c)"></button>
+  </div>
+</section>
+
 <section>
   <h3>{{ isSpray ? 'Spray width' : isText ? 'Text size' : isSticker ? 'Sticker size' : 'Size' }}</h3>
   <div class="size">
     <span class="dotbox" *ngIf="isText || isSticker; else dot" [style.color]="isText ? sel.color : null"
+      [style.background]="isText && sel.textBg ? sel.textBg : null"
       [style.font-size.px]="isText ? 10 + sel.brushSize * 0.6 : 14 + sel.brushSize * 0.6">{{ isText ? 'Aa' : sel.tool.selectedOption.name }}</span>
     <ng-template #dot><span class="dotbox"><span class="sizedot" [style.width.px]="dotPx" [style.height.px]="dotPx"
       [style.background]="sel.tool.name === 'Eraser' ? '#d1d5db' : sel.color"></span></span></ng-template>

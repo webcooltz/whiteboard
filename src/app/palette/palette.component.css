@@ -37,6 +37,7 @@ h3 { margin: 0 0 .5rem; font-size: 11px; font-weight: 600; letter-spacing: .06em
 }
 .swatch:hover { transform: scale(1.1); }
 .swatch.on { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--accent); }
+.none { background: linear-gradient(135deg, #fff 45%, #ef4444 45% 55%, #fff 55%); }
 .custom { background: conic-gradient(#ef4444, #facc15, #22c55e, #3b82f6, #a855f7, #ef4444); color: #fff; font-size: 11px; text-shadow: 0 0 3px rgba(0, 0, 0, .6); }
 
 .size { display: flex; align-items: center; gap: .6rem; }

@@ -58,6 +58,7 @@ export class BoardService {
       case 'begin': v?.begin(m as Stroke); break;
       case 'pts': v?.pts(m.id, m.p); break;
       case 'end': v?.end(m.id); break;
+      case 'put': v?.put(m.s as Stroke); break;
       case 'remove': v?.remove(m.id); break;
       case 'reset':
         this.lastStrokes = m.strokes;
@@ -75,6 +76,13 @@ export class BoardService {
   // ---- actions ----
   undo(): void { this.client.send({ t: 'undo' }); }
   redo(): void { this.client.send({ t: 'redo' }); }
+  /** Change a text box (empty text deletes it). The view is updated right away; the server's copy follows. */
+  editText(s: Stroke): void {
+    if (!this.view?.has(s.id)) return this.notify('That text box was removed by someone else');
+    if (s.text?.trim()) this.view?.put(s);
+    else this.view?.remove(s.id);
+    this.client.send({ t: 'edit', id: s.id, text: s.text ?? '', color: s.color, size: s.size, bg: s.bg ?? null });
+  }
   /** Switch this connection to the name in a fresh token (if offline, the next connect uses it anyway). */
   rename(token: string): void { this.client.send({ t: 'rename', token }); }
   erase(): void { this.client.send({ t: 'clear' }); }
