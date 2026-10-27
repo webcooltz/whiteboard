@@ -1,4 +1,6 @@
-# Whiteboard
+<p align="center"><img src="docs/logo.png" alt="Whiteboard logo" width="150"></p>
+
+<h1 align="center">Whiteboard</h1>
 
 A shared whiteboard that stays on. Open it in a browser, sign in, and everyone sees each other draw in real time.
 Good for a family fridge, a team wall display, or a classroom.

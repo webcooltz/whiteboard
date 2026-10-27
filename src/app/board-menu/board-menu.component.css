@@ -4,10 +4,7 @@
   background: var(--panel); border-bottom: 1px solid var(--border);
 }
 .brand { display: flex; align-items: center; gap: .55rem; font-weight: 700; font-size: 16px; }
-.logo {
-  width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(135deg, #6366f1, #a855f7); color: #fff; font-size: 14px;
-}
+.logo { width: 34px; height: 34px; display: block; }
 .status {
   display: inline-flex; align-items: center; gap: .4rem; padding: .2rem .6rem; border-radius: 99px;
   background: #fffbeb; color: #92400e; font-size: 12px; font-weight: 600;
