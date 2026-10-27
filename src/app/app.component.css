@@ -1,5 +1,6 @@
 .page {
-  display: grid; height: 100vh; width: 100vw; overflow: hidden;
+  /* dvh: the height actually visible on phones, so the browser's own bars never push the page into scrolling. */
+  display: grid; height: 100vh; height: 100dvh; width: 100vw; overflow: hidden;
   grid-template: "top top" 60px "side board" 1fr / 248px 1fr;
 }
 .page.kiosk { grid-template: "board" 1fr / 1fr; }
@@ -9,8 +10,11 @@
 
 /* Phones held upright: tools under the board. */
 @media (max-width: 800px) and (orientation: portrait) {
-  .page { grid-template: "top" 56px "board" 1fr "side" auto / 100%; }
-  .side { max-height: 42vh; }
+  .page { grid-template: "top" 52px "board" 1fr "side" auto / 100%; }
+  .side { max-height: 55dvh; }
+  /* The bar slides out of the way while a stroke is being drawn (no reflow, so the board does not move under the finger). */
+  .top { position: relative; z-index: 5; transition: transform .18s ease, opacity .18s ease; }
+  .page.drawing .top { transform: translateY(-100%); opacity: 0; pointer-events: none; }
 }
 /* Small landscape screens (e.g. the 800x480 Raspberry Pi touchscreen): a narrow sidebar keeps the board big. */
 @media (max-width: 1000px) and (orientation: landscape) { .page { grid-template-columns: 188px 1fr; } }

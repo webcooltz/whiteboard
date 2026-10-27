@@ -164,6 +164,34 @@ test('invalid strokes are rejected and do not reach other users', async () => {
   ann.close(); bob.close();
 });
 
+test('text boxes and stickers sync, keep their text, and undo like strokes', async () => {
+  const ann = await connect('Ann');
+  const bob = await connect('Bob');
+  ann.send(stroke('textbox01', { tool: 'text', size: 32, p: [100, 120], text: 'Hello\r\nteam\u0007' }));
+  const t = await bob.wait((m) => m.t === 'begin' && m.id === 'textbox01');
+  assert.equal(t.text, 'Hello\nteam');
+  ann.send({ t: 'pts', id: 'textbox01', p: [500, 500] }); // ignored: a text box is one point
+  ann.send({ t: 'end', id: 'textbox01' });
+  ann.send(stroke('sticker01', { tool: 'sticker', size: 64, p: [300, 300], text: '👍🏽' }));
+  ann.send({ t: 'end', id: 'sticker01' });
+  await bob.wait((m) => m.t === 'end' && m.id === 'sticker01');
+  assert.deepEqual(app.store.strokes.find((s) => s.id === 'textbox01').p, [100, 120]);
+  assert.equal(app.store.strokes.find((s) => s.id === 'sticker01').text, '👍🏽');
+
+  const bad = [
+    stroke('badtext01', { tool: 'text', p: [1, 1] }), stroke('badtext02', { tool: 'text', p: [1, 1], text: '   ' }),
+    stroke('badtext03', { tool: 'text', p: [1, 1], text: 'x'.repeat(501) }), stroke('badtext04', { tool: 'text', text: 'two points' }),
+    stroke('badstick1', { tool: 'sticker', p: [1, 1], text: 'way too long for a sticker' }), stroke('badstick2', { tool: 'sticker', p: [1, 1], text: 'a\nb' }),
+  ];
+  for (const b of bad) ann.send(b);
+  await sleep(150);
+  assert.equal(bob.msgs.filter((m) => m.t === 'begin' && m.id.startsWith('bad')).length, 0);
+
+  ann.send({ t: 'undo' });
+  assert.equal((await bob.wait((m) => m.t === 'remove')).id, 'sticker01');
+  ann.close(); bob.close();
+});
+
 test('undo removes only your own last stroke', async () => {
   const ann = await connect('Ann');
   const bob = await connect('Bob');
@@ -176,6 +204,33 @@ test('undo removes only your own last stroke', async () => {
   assert.equal(rm.id, 'annstroke1');
   assert.equal(rm.by, 'Ann');
   assert.ok(app.store.has('bobstroke1'));
+  ann.close(); bob.close();
+});
+
+test('redo restores your own undone strokes, and drawing again ends the redo chain', async () => {
+  const ann = await connect('Ann');
+  const bob = await connect('Bob');
+  ann.send(stroke('annredo01')); ann.send({ t: 'end', id: 'annredo01' });
+  ann.send(stroke('annredo02')); ann.send({ t: 'end', id: 'annredo02' });
+  await bob.wait((m) => m.t === 'end' && m.id === 'annredo02');
+  ann.send({ t: 'undo' }); ann.send({ t: 'undo' });
+  await bob.wait((m) => m.t === 'remove' && m.id === 'annredo01');
+  bob.send({ t: 'redo' }); // Bob has nothing to redo; Ann's strokes stay gone
+  await sleep(100);
+  assert.ok(!app.store.has('annredo01') && !app.store.has('annredo02'));
+
+  ann.send({ t: 'redo' });
+  const b = await bob.wait((m) => m.t === 'begin' && m.id === 'annredo01');
+  assert.equal(b.user, 'Ann');
+  assert.ok(b.p.length > 0, 'redo sends the whole stroke');
+  await ann.wait((m) => m.t === 'end' && m.id === 'annredo01');
+  assert.ok(app.store.has('annredo01'));
+
+  ann.send(stroke('annredo03')); ann.send({ t: 'end', id: 'annredo03' });
+  await bob.wait((m) => m.t === 'end' && m.id === 'annredo03');
+  ann.send({ t: 'redo' });
+  await sleep(100);
+  assert.ok(!app.store.has('annredo02'), 'a new stroke clears what could be redone');
   ann.close(); bob.close();
 });
 
@@ -233,6 +288,34 @@ test('rename: a signed-in person can change their name; devices and bad names ca
   const dev = await login({ deviceKey: '0123456789abcdef0123' });
   assert.equal((await post(dev.body.token, 'Bob')).status, 403);
   assert.ok(app.audit.tail(20).some((e) => e.ev === 'rename' && e.user === 'Annie' && e.from === 'Ann'));
+});
+
+test('renaming keeps you the same person: no reconnect, and undo/redo still reach your earlier strokes', async () => {
+  const secret = readFileSync(join(dir, 'data', 'secret.key'), 'utf8').trim();
+  const { body } = await login({ name: 'Cara', password: 'correct horse' });
+  const cara = await connect('Cara', { token: body.token });
+  const bob = await connect('Bob');
+  cara.send(stroke('carastroke1')); cara.send({ t: 'end', id: 'carastroke1' });
+  await bob.wait((m) => m.t === 'end' && m.id === 'carastroke1');
+
+  const r = await fetch(`http://127.0.0.1:${port}/api/rename`, { method: 'POST', headers: { Authorization: `Bearer ${body.token}` }, body: JSON.stringify({ name: 'Carla' }) });
+  const renamed = await r.json();
+  assert.equal(verifyToken(secret, renamed.token).id, verifyToken(secret, body.token).id, 'same identity');
+  cara.send({ t: 'rename', token: renamed.token });
+  const u = await bob.wait((m) => m.t === 'users' && m.users.includes('Carla'));
+  assert.ok(!u.users.includes('Cara'));
+  assert.equal(cara.ws.readyState, WebSocket.OPEN, 'still the same connection');
+
+  cara.send({ t: 'undo' });
+  assert.equal((await bob.wait((m) => m.t === 'remove' && m.id === 'carastroke1')).by, 'Carla');
+  cara.send({ t: 'redo' });
+  await bob.wait((m) => m.t === 'begin' && m.id === 'carastroke1');
+
+  // A token for someone else's sign-in can't take over this connection.
+  const other = (await login({ name: 'Mallory', password: 'correct horse' })).body.token;
+  cara.send({ t: 'rename', token: other });
+  await cara.wait((m) => m.t === 'error' && /name/.test(m.msg));
+  cara.close(); bob.close();
 });
 
 test('env file: KEY=value lines, comments and quotes; real env wins in loadConfig', () => {

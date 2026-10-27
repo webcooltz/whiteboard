@@ -11,6 +11,7 @@ import { BoardService } from './services/board.service';
 export class AppComponent implements OnInit, OnDestroy {
   title = 'whiteboard';
   private sub?: Subscription;
+  private renameSub?: Subscription;
 
   constructor(public auth: AuthService, private board: BoardService) {}
 
@@ -22,10 +23,12 @@ export class AppComponent implements OnInit, OnDestroy {
       this.board.disconnect();
       if (token) this.board.connect();
     });
+    this.renameSub = this.auth.renamed.subscribe((token) => this.board.rename(token));
   }
 
   ngOnDestroy(): void {
     this.sub?.unsubscribe();
+    this.renameSub?.unsubscribe();
     this.board.disconnect();
   }
 }

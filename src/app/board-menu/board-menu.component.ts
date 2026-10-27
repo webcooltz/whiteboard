@@ -101,8 +101,12 @@ export class BoardMenuComponent {
       case 'rename': return `changed their name (was "${s('from')}")`;
       case 'connect': return 'joined the board';
       case 'disconnect': return 'left the board';
-      case 'stroke': return `drew with the ${s('tool')} (${s('points')} points)`;
+      case 'stroke':
+        if (e['tool'] === 'text') return 'added a text box';
+        if (e['tool'] === 'sticker') return 'placed a sticker';
+        return `drew with the ${s('tool')} (${s('points')} points)`;
       case 'undo': return 'undid their last stroke';
+      case 'redo': return 'redid a stroke they undid';
       case 'clear': return `erased the board (${s('removed')} strokes${e['backup'] ? `; backup "${s('backup')}"` : ''})`;
       case 'save': return `saved the board as "${s('name')}"${e['overwrote'] ? ' (replaced an older save)' : ''}`;
       case 'load': return `opened "${s('name')}"${e['backup'] ? ` (previous board backed up as "${s('backup')}")` : ''}`;

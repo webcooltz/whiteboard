@@ -58,8 +58,10 @@ time { display: block; }
 @media (max-width: 800px) {
   .bar { gap: .4rem; padding: 0 .5rem; }
   .brand .name, .people, .sep, .me, .edit { display: none; }
-  .chip { padding: 0 .3rem; }
-  .drawer { top: 64px; }
+  .chip { padding: 0 .3rem; margin-left: 0; height: 36px; }
+  .actions { gap: 0; }
+  .actions .btn { width: 36px; padding: 0; }
+  .drawer { top: 60px; }
 }
 @media (max-height: 560px) { .drawer { top: 54px; } .chip { height: 36px; } }
 @media (max-width: 420px) { .status { display: none; } }

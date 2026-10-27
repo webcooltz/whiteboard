@@ -4,6 +4,7 @@ import { W, H, MAX_POINTS, cleanBegin, cleanPoints, cleanSnapshotName } from './
 
 const MAX_STROKES = 100_000;
 const MAX_OPEN_PER_CLIENT = 4;
+const MAX_REDO = 100;
 
 const stamp = () => new Date().toISOString().slice(0, 19).replace('T', ' ').replace(/:/g, '-');
 
@@ -14,6 +15,7 @@ export class Hub {
     this.secret = secret;
     this.maxClients = maxClients;
     this.clients = new Set();
+    this.redo = new Map(); // identity -> strokes they undid, most recent last
   }
 
   attach(ws, ip) {
@@ -21,7 +23,7 @@ export class Hub {
       ws.send(JSON.stringify({ t: 'error', msg: 'Too many connections' }));
       return ws.close(1013, 'busy');
     }
-    const c = { ws, ip, user: null, kind: null, open: new Map(), tokens: 400, last: Date.now() };
+    const c = { ws, ip, user: null, uid: null, kind: null, open: new Map(), tokens: 400, last: Date.now() };
     this.clients.add(c);
     const authTimer = setTimeout(() => { if (!c.user) ws.close(1008, 'auth timeout'); }, 10_000);
     ws.on('message', (text) => this.#onMessage(c, text));
@@ -45,6 +47,7 @@ export class Hub {
   }
   #resetAll(by, strokes) {
     for (const c of this.clients) c.open.clear();
+    this.redo.clear();
     this.#broadcast({ t: 'reset', by, strokes });
   }
   #backup(user, why) {
@@ -69,6 +72,7 @@ export class Hub {
   #commit(c, s) {
     if (!this.store.has(s.id) && this.store.strokes.length < MAX_STROKES) {
       this.store.add(s);
+      this.redo.delete(c.uid); // drawing something new ends the redo chain
       this.audit.log('stroke', c.user, { id: s.id, tool: s.tool, points: s.p.length / 2 });
     }
     this.#broadcast({ t: 'end', id: s.id }, c);
@@ -88,6 +92,7 @@ export class Hub {
       const v = verifyToken(this.secret, m.token);
       if (!v) { this.audit.log('ws_auth_fail', null, { ip: c.ip }); this.#send(c, { t: 'auth_fail' }); return c.ws.close(1008, 'bad token'); }
       c.user = v.user;
+      c.uid = v.id ?? `name:${v.user}`; // old tokens have no id: fall back to the name, as before
       c.kind = v.kind;
       this.audit.log('connect', c.user, { ip: c.ip, kind: c.kind });
       this.#send(c, {
@@ -103,6 +108,8 @@ export class Hub {
       case 'pts': return this.#pts(c, m);
       case 'end': return this.#end(c, m);
       case 'undo': return this.#undo(c);
+      case 'redo': return this.#redo(c);
+      case 'rename': return this.#rename(c, m);
       case 'clear': return this.#clear(c);
       case 'save': return this.#save(c, m);
       case 'load': return this.#load(c, m);
@@ -125,14 +132,14 @@ export class Hub {
     if (!h) return this.#send(c, { t: 'error', msg: 'Invalid stroke' });
     if (c.open.size >= MAX_OPEN_PER_CLIENT || this.store.has(h.id) || [...this.clients].some((o) => o.open.has(h.id))) return;
     if (this.store.strokes.length >= MAX_STROKES) return this.#send(c, { t: 'error', msg: 'Board is full — erase or save it first' });
-    const s = { ...h, user: c.user };
+    const s = { ...h, user: c.user, uid: c.uid };
     c.open.set(s.id, s);
     this.#broadcast({ t: 'begin', ...s }, c);
   }
 
   #pts(c, m) {
     const s = c.open.get(m.id);
-    if (!s) return;
+    if (!s || s.text !== undefined) return; // text and stickers have no points to add
     const p = cleanPoints(m.p);
     if (!p) return;
     if (s.tool === 'line') {
@@ -153,11 +160,32 @@ export class Hub {
   }
 
   #undo(c) {
-    const s = this.store.lastBy(c.user);
+    const s = this.store.lastBy(c.uid, c.user);
     if (!s) return;
     this.store.remove(s.id);
+    const stack = this.redo.get(c.uid) ?? [];
+    stack.push(s);
+    if (stack.length > MAX_REDO) stack.shift();
+    this.redo.set(c.uid, stack);
     this.audit.log('undo', c.user, { id: s.id });
     this.#broadcast({ t: 'remove', id: s.id, by: c.user });
+  }
+
+  #redo(c) {
+    const s = this.redo.get(c.uid)?.pop();
+    if (!s || this.store.has(s.id) || this.store.strokes.length >= MAX_STROKES) return;
+    this.store.add(s);
+    this.audit.log('redo', c.user, { id: s.id });
+    this.#broadcast({ t: 'begin', ...s });
+    this.#broadcast({ t: 'end', id: s.id });
+  }
+
+  // The client got a new token from /api/rename (which audits it); switch names without reconnecting.
+  #rename(c, m) {
+    const v = verifyToken(this.secret, m.token);
+    if (!v || !v.id || v.id !== c.uid || v.kind !== c.kind) return this.#send(c, { t: 'error', msg: 'Could not change your name' });
+    for (const o of this.clients) if (o.uid === c.uid) o.user = v.user; // every tab of this sign-in
+    this.#broadcast({ t: 'users', users: this.#users() });
   }
 
   // ---- board management ----

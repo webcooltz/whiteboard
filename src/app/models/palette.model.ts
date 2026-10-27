@@ -38,6 +38,40 @@ export class Palette {
     new Tool('Eraser', 'Erase drawings', 'fas fa-eraser', 'erasing', [
       {name: 'eraser', description: 'Erase drawings', icon: 'fas fa-eraser'}
     ]),
+    new Tool('Text', 'Type a text box', 'fas fa-font', 'text', [
+      {name: 'text', description: 'Text', icon: 'fas fa-font'}
+    ]),
+    // Each option is one sticker; its name is what gets placed.
+    new Tool('Sticker', 'Stamp a sticker', 'fas fa-face-smile', 'sticker', [
+      {name: '⭐', description: '⭐', icon: ''},
+      {name: '❤️', description: '❤️', icon: ''},
+      {name: '👍', description: '👍', icon: ''},
+      {name: '👎', description: '👎', icon: ''},
+      {name: '😀', description: '😀', icon: ''},
+      {name: '😂', description: '😂', icon: ''},
+      {name: '😍', description: '😍', icon: ''},
+      {name: '😎', description: '😎', icon: ''},
+      {name: '🤔', description: '🤔', icon: ''},
+      {name: '😮', description: '😮', icon: ''},
+      {name: '😢', description: '😢', icon: ''},
+      {name: '🎉', description: '🎉', icon: ''},
+      {name: '🔥', description: '🔥', icon: ''},
+      {name: '✅', description: '✅', icon: ''},
+      {name: '❌', description: '❌', icon: ''},
+      {name: '❓', description: '❓', icon: ''},
+      {name: '❗', description: '❗', icon: ''},
+      {name: '💡', description: '💡', icon: ''},
+      {name: '🚀', description: '🚀', icon: ''},
+      {name: '👀', description: '👀', icon: ''},
+      {name: '🐱', description: '🐱', icon: ''},
+      {name: '🐶', description: '🐶', icon: ''},
+      {name: '🌈', description: '🌈', icon: ''},
+      {name: '☀️', description: '☀️', icon: ''},
+      {name: '🍕', description: '🍕', icon: ''},
+      {name: '🏆', description: '🏆', icon: ''},
+      {name: '💯', description: '💯', icon: ''},
+      {name: '👋', description: '👋', icon: ''}
+    ]),
   ];
 
   // usage:

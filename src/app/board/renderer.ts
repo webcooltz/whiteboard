@@ -25,7 +25,26 @@ function paperHole(x: number, y: number): boolean {
  * Every other brush is painted point by point as it grows.
  */
 export function isWhole(s: Stroke): boolean {
-  return s.tool === 'line' || s.tool === 'marker' || s.tool === 'highlighter';
+  return s.tool === 'line' || s.tool === 'marker' || s.tool === 'highlighter' || s.text !== undefined;
+}
+
+export const TEXT_FONT = "500 {size}px 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif";
+export const STICKER_FONT = "{size}px 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif";
+export const LINE_HEIGHT = 1.25;
+
+/** Text boxes: lines from the top-left point. Stickers: one emoji centered on the point. */
+function drawText(ctx: CanvasRenderingContext2D, s: Stroke): void {
+  ctx.save();
+  ctx.fillStyle = s.color;
+  const sticker = s.tool === 'sticker';
+  ctx.font = (sticker ? STICKER_FONT : TEXT_FONT).replace('{size}', String(s.size));
+  ctx.textAlign = sticker ? 'center' : 'left';
+  ctx.textBaseline = sticker ? 'middle' : 'top';
+  const lines = (s.text ?? '').split('\n');
+  // Text boxes match the HTML field they were typed in, whose lines have half the extra line height above them.
+  const top = sticker ? s.p[1] : s.p[1] + (s.size * (LINE_HEIGHT - 1)) / 2;
+  lines.forEach((line, i) => ctx.fillText(line, s.p[0], top + i * s.size * LINE_HEIGHT));
+  ctx.restore();
 }
 
 /** Draw a finished stroke. */
@@ -60,10 +79,11 @@ export function paintTail(ctx: CanvasRenderingContext2D, s: Stroke): void {
   ctx.restore();
 }
 
-/** Draw a stroke as a single path (lines, marker, highlighter — and previews of them). */
+/** Draw a stroke as a single path (lines, marker, highlighter — and previews of them), or a text box / sticker. */
 export function drawWhole(ctx: CanvasRenderingContext2D, s: Stroke): void {
   const n = s.p.length / 2;
   if (n === 0) return;
+  if (s.text !== undefined) { drawText(ctx, s); return; }
   const p = s.p;
   ctx.save();
   setup(ctx, s);

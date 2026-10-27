@@ -16,6 +16,9 @@
     <button class="btn ghost" type="button" (click)="board.undo()" title="Undo your last stroke (Ctrl+Z)">
       <i class="fas fa-rotate-left"></i><span class="lbl">Undo</span>
     </button>
+    <button class="btn ghost" type="button" (click)="board.redo()" title="Redo your last undone stroke (Ctrl+Y)">
+      <i class="fas fa-rotate-right"></i><span class="lbl">Redo</span>
+    </button>
     <span class="sep"></span>
     <button class="btn ghost" type="button" (click)="startSave()" title="Save a copy of this board">
       <i class="fas fa-floppy-disk"></i><span class="lbl">Save</span>

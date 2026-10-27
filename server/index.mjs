@@ -119,7 +119,8 @@ export async function createServer(config = loadConfig()) {
     const name = cleanName(body?.name);
     if (!name) return json(res, 400, { error: "Use 1–24 letters, numbers, spaces or . _ ' -" });
     if (name !== auth.user) audit.log('rename', name, { from: auth.user, ip: clientIp(req) });
-    return json(res, 200, { token: signToken(secret, name, 'user', config.tokenTtlMs), user: name });
+    // Same identity, new name: the board keeps treating you as the same person.
+    return json(res, 200, { token: signToken(secret, name, 'user', config.tokenTtlMs, undefined, auth.id ?? undefined), user: name });
   }
 
   function serveStatic(req, res, pathname) {

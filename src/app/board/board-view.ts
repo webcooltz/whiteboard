@@ -43,7 +43,7 @@ export class BoardView {
 
   pts(id: string, p: number[]): void {
     const s = this.active.get(id);
-    if (!s) return;
+    if (!s || s.text !== undefined) return;
     if (s.tool === 'line') s.p = [s.p[0], s.p[1], p[p.length - 2], p[p.length - 1]];
     else for (const v of p) s.p.push(v);
     this.paintActive(s);

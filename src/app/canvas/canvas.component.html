@@ -3,8 +3,13 @@
     <div class="frame" #frame>
       <canvas #whiteboard class="layer board" width="1600" height="900" tabindex="0"
         role="application"
-        aria-label="Shared whiteboard. Arrow keys move the cursor, Space starts and stops drawing, Escape stops, Control+Z undoes."></canvas>
+        aria-label="Shared whiteboard. Arrow keys move the cursor, Space starts and stops drawing or places text and stickers, Escape stops, Control+Z undoes, Control+Y redoes."></canvas>
       <canvas #overlay class="layer overlay" width="1600" height="900" aria-hidden="true"></canvas>
+      <textarea #textField *ngIf="editor" class="text-field" [(ngModel)]="editorText" maxlength="500"
+        [style.left.%]="editor.x / 16" [style.top.%]="editor.y / 9" [style.color]="editor.color"
+        [style.font-size.px]="editorFontPx" [style.line-height]="lineHeight"
+        [attr.rows]="editorRows" [attr.cols]="editorCols" aria-label="Text box. Enter places it, Shift+Enter adds a line, Escape cancels."
+        placeholder="Type…" (keydown)="onTextKey($event)" (blur)="commitText()"></textarea>
       <div class="banner" *ngIf="board.status !== 'online'" role="status">
         <i class="fas fa-wifi"></i>
         {{ board.status === 'connecting' ? 'Connecting…' : 'Offline — reconnecting. Drawing is paused.' }}

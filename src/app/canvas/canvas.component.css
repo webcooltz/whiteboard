@@ -11,6 +11,13 @@
 .board:focus { outline: none; }
 .board.kb:focus { outline: 3px solid var(--accent); outline-offset: -3px; border-radius: 12px; }
 .overlay { pointer-events: none; }
+/* Sits exactly where the text will be drawn (top-left at the click), same font and size. */
+.text-field {
+  position: absolute; z-index: 2; margin: 0; padding: 0; border: 0; outline: 1px dashed var(--accent); outline-offset: 4px;
+  background: transparent; resize: none; overflow: hidden; white-space: pre; font-family: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-weight: 500; min-width: 4ch; field-sizing: content;
+}
+.text-field::placeholder { color: #9ca3af; }
 .banner {
   position: absolute; left: 50%; top: 12px; transform: translateX(-50%); display: flex; align-items: center; gap: .45rem;
   background: #fffbeb; color: #92400e; border: 1px solid #fde68a; padding: .35rem .8rem; border-radius: 99px;

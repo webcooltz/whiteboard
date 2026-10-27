@@ -25,6 +25,8 @@ export class AuthService {
   /** Raspberry Pi / wall display that only shows the board. */
   readOnly = false;
   tokenChanged = new Subject<string | null>();
+  /** Same session, new name and token: the board connection switches names without reconnecting. */
+  renamed = new Subject<string>();
   private lastStatus = 0;
 
   constructor() {
@@ -53,16 +55,16 @@ export class AuthService {
   /** Device-key screens have a fixed name. */
   get canRename(): boolean { return !read(DEVKEY_KEY); }
 
-  private expired(token: string): boolean {
-    try {
-      const body = JSON.parse(atob(token.split('.')[0].replace(/-/g, '+').replace(/_/g, '/')));
-      return typeof body.exp !== 'number' || body.exp < Date.now() + 60_000;
-    } catch {
-      return true;
-    }
+  private static body(token: string): any {
+    try { return JSON.parse(atob(token.split('.')[0].replace(/-/g, '+').replace(/_/g, '/'))); } catch { return null; }
   }
 
-  private async post(url: string, body: unknown, token?: string): Promise<boolean> {
+  private expired(token: string): boolean {
+    const body = AuthService.body(token);
+    return typeof body?.exp !== 'number' || body.exp < Date.now() + 60_000;
+  }
+
+  private async post(url: string, body: unknown, token?: string, rename = false): Promise<boolean> {
     this.busy = true;
     this.error = '';
     this.lastStatus = 0;
@@ -76,7 +78,7 @@ export class AuthService {
         this.error = data.error || 'Sign-in failed';
         return false;
       }
-      this.setSession(data.token, data.user);
+      this.setSession(data.token, data.user, rename);
       return true;
     } catch {
       this.error = 'Cannot reach the server';
@@ -86,14 +88,15 @@ export class AuthService {
     }
   }
 
-  private setSession(token: string | null, user: string): void {
+  private setSession(token: string | null, user: string, rename = false): void {
     this.token = token;
     if (token) {
       this.user = user;
       write(USER_KEY, user); // kept after the session ends, to pre-fill the name box
     }
     write(TOKEN_KEY, token);
-    this.tokenChanged.next(token);
+    if (rename && token) this.renamed.next(token);
+    else this.tokenChanged.next(token);
   }
 
   /** Sign in without asking, when this screen has a device key, or a stored password and a name. */
@@ -114,7 +117,9 @@ export class AuthService {
   /** Change the name on the current session (the server issues a new token). */
   rename(name: string): Promise<boolean> {
     if (!this.token) return Promise.resolve(false);
-    return this.post('/api/rename', { name }, this.token);
+    // Tokens from before sessions had an id can't be renamed in place; those reconnect under the new name.
+    const inPlace = typeof AuthService.body(this.token)?.i === 'string';
+    return this.post('/api/rename', { name }, this.token, inPlace);
   }
 
   /** The server rejected our token (expired, or the server secret changed). */

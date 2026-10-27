@@ -74,6 +74,9 @@ export class BoardService {
 
   // ---- actions ----
   undo(): void { this.client.send({ t: 'undo' }); }
+  redo(): void { this.client.send({ t: 'redo' }); }
+  /** Switch this connection to the name in a fresh token (if offline, the next connect uses it anyway). */
+  rename(token: string): void { this.client.send({ t: 'rename', token }); }
   erase(): void { this.client.send({ t: 'clear' }); }
   save(name: string): void { this.client.send({ t: 'save', name }); }
   load(name: string): void { this.client.send({ t: 'load', name }); }

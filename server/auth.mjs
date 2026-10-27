@@ -39,8 +39,12 @@ export function loadSecret(envValue, file) {
 
 const b64u = (b) => Buffer.from(b).toString('base64url');
 
-export function signToken(secret, user, kind, ttlMs, now = Date.now()) {
-  const body = b64u(JSON.stringify({ u: user, k: kind, exp: now + ttlMs }));
+// A random id for one sign-in. It stays the same when the person renames themselves,
+// so their strokes (for undo/redo) and presence follow them instead of their name.
+export const newIdentity = () => randomBytes(9).toString('base64url');
+
+export function signToken(secret, user, kind, ttlMs, now = Date.now(), id = newIdentity()) {
+  const body = b64u(JSON.stringify({ u: user, k: kind, i: id, exp: now + ttlMs }));
   const sig = createHmac('sha256', secret).update(body).digest('base64url');
   return `${body}.${sig}`;
 }
@@ -56,7 +60,7 @@ export function verifyToken(secret, token, now = Date.now()) {
   try {
     const d = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
     if (typeof d.u !== 'string' || typeof d.exp !== 'number' || d.exp < now) return null;
-    return { user: d.u, kind: d.k };
+    return { user: d.u, kind: d.k, id: typeof d.i === 'string' ? d.i : null }; // tokens from before ids have none
   } catch { return null; }
 }
 

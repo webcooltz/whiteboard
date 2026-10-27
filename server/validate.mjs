@@ -4,7 +4,10 @@ export const H = 900;
 export const MAX_POINTS = 40_000; // numbers (x,y pairs => 20k points) per stroke
 export const MAX_CHUNK = 2_000;
 
-const TOOLS = new Set(['pen', 'pencil', 'marker', 'highlighter', 'crayon', 'eraser', 'line', 'spray']);
+const TOOLS = new Set(['pen', 'pencil', 'marker', 'highlighter', 'crayon', 'eraser', 'line', 'spray', 'text', 'sticker']);
+const MAX_TEXT = 500;
+const MAX_LINES = 20;
+const MAX_STICKER = 16; // UTF-16 units: room for one emoji with skin tone / ZWJ joins
 const CAPS = new Set(['round', 'square', 'butt']);
 const ID_RE = /^[A-Za-z0-9_-]{6,40}$/;
 const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
@@ -37,7 +40,20 @@ export function cleanBegin(m) {
   const density = num(m.density, 1, 200) ? m.density : 50;
   const p = cleanPoints(m.p);
   if (!p) return null;
-  return { id: m.id, tool: m.tool, color: m.color, size: m.size, cap: m.cap, dash, seed, radius, density, p };
+  const h = { id: m.id, tool: m.tool, color: m.color, size: m.size, cap: m.cap, dash, seed, radius, density, p };
+  if (m.tool !== 'text' && m.tool !== 'sticker') return h;
+  // Text boxes and stickers are placed at one point and carry their text.
+  const text = cleanText(m.text, m.tool === 'sticker' ? MAX_STICKER : MAX_TEXT);
+  if (!text || p.length !== 2 || (m.tool === 'sticker' && text.includes('\n'))) return null;
+  return { ...h, text };
+}
+
+export function cleanText(v, max) {
+  if (typeof v !== 'string') return null;
+  // Control characters (except newline) would render as boxes or reorder text; drop them.
+  const t = v.replace(/\r\n?/g, '\n').replace(/[\u0000-\u0009\u000b-\u001f\u007f‪-‮⁦-⁩]/g, '').replace(/\s+$/, '');
+  if (!t.trim() || t.length > max || t.split('\n').length > MAX_LINES) return null;
+  return t;
 }
 
 export function cleanSnapshotName(name) {

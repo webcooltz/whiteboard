@@ -65,8 +65,12 @@ export class Store {
     this.compact(); // a "set" is the whole board, so rewrite the journal rather than append it
   }
 
-  lastBy(user) {
-    for (let i = this.strokes.length - 1; i >= 0; i--) if (this.strokes[i].user === user) return this.strokes[i];
+  // The newest stroke drawn by this identity. Strokes from before identities existed only have a name.
+  lastBy(uid, user) {
+    for (let i = this.strokes.length - 1; i >= 0; i--) {
+      const s = this.strokes[i];
+      if (s.uid ? s.uid === uid : s.user === user) return s;
+    }
     return null;
   }
 

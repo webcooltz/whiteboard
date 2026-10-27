@@ -16,11 +16,16 @@ const MAX_CHUNK = 1800; // numbers per message; the server accepts 2000
  * Strokes are painted locally right away and streamed to the server in small batches.
  *
  * Keyboard: Tab (or click) to focus the board, arrow keys move the cursor
- * (Shift = big steps, Alt = tiny steps), Space/Enter starts and stops drawing, Esc stops, Ctrl+Z undoes.
+ * (Shift = big steps, Alt = tiny steps), Space/Enter starts and stops drawing (or places a text box / sticker),
+ * Esc stops, Ctrl+Z undoes, Ctrl+Y / Ctrl+Shift+Z redoes.
  */
 export class InputController {
   enabled = true;
   user = '';
+  /** The Text tool was used at (x, y): the page shows a text field there and calls placeText() when done. */
+  onTextRequest: ((x: number, y: number) => void) | null = null;
+  /** A stroke started (true) or finished (false). */
+  onDrawing: ((drawing: boolean) => void) | null = null;
   private canvas: HTMLCanvasElement;
   private board: BoardView;
   private getTool: () => ToolState;
@@ -108,6 +113,11 @@ export class InputController {
   // ---- keyboard ----
   private onKey(e: KeyboardEvent): void {
     const k = e.key;
+    if ((e.ctrlKey || e.metaKey) && (k.toLowerCase() === 'y' || (e.shiftKey && k.toLowerCase() === 'z'))) {
+      e.preventDefault();
+      this.net.send({ t: 'redo' });
+      return;
+    }
     if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === 'z') {
       e.preventDefault();
       this.net.send({ t: 'undo' });
@@ -144,15 +154,38 @@ export class InputController {
   private start(x: number, y: number): boolean {
     if (!this.enabled || !this.net.online || this.current) return false;
     const t = this.getTool();
+    if (t.tool === 'text') { this.onTextRequest?.(round(x), round(y)); return false; }
+    if (t.tool === 'sticker') { if (t.text) this.place(x, y, t.text, t); return false; }
     const s: Stroke = {
       id: newStrokeId(), user: this.user, tool: t.tool, color: t.color, size: t.size, cap: t.cap,
       dash: t.dash, seed: newSeed(), radius: t.radius, density: t.density, p: [round(x), round(y)],
     };
     this.current = s;
     this.board.begin(s);
+    this.onDrawing?.(true);
     const { user, ...wire } = s;
     this.net.send({ t: 'begin', ...wire });
     return true;
+  }
+
+  /** Put a finished text box at (x, y) with the current tool's color and size. */
+  placeText(x: number, y: number, text: string): void {
+    const t = this.getTool();
+    if (t.tool === 'text' && text.trim()) this.place(x, y, text, t);
+  }
+
+  // Text and stickers are whole from the start: begin and end in one go.
+  private place(x: number, y: number, text: string, t: ToolState): void {
+    if (!this.enabled || !this.net.online) return;
+    const s: Stroke = {
+      id: newStrokeId(), user: this.user, tool: t.tool, color: t.color, size: t.size, cap: t.cap,
+      dash: [], seed: 0, radius: t.radius, density: t.density, p: [round(x), round(y)], text,
+    };
+    this.board.begin(s);
+    const { user, ...wire } = s;
+    this.net.send({ t: 'begin', ...wire });
+    this.net.send({ t: 'end', id: s.id });
+    this.board.end(s.id);
   }
 
   private add(x: number, y: number, force = false): void {
@@ -185,6 +218,7 @@ export class InputController {
     this.current = null;
     this.net.send({ t: 'end', id: s.id });
     this.board.end(s.id);
+    this.onDrawing?.(false);
   }
 
   private sendCursor(x: number, y: number): void {

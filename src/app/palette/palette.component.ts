@@ -9,6 +9,7 @@ import { UserSelections } from '../models/user-selections.model';
 import { drawStroke } from '../board/renderer';
 import { toolStateFrom } from '../board/tool-state';
 
+const NO_PREVIEW = new Set(['Eraser', 'Text', 'Sticker']); // these tiles show an icon instead of a sample stroke
 const SWATCHES = ['#1f2937', '#ffffff', '#9ca3af', '#ef4444', '#f97316', '#facc15', '#22c55e', '#3b82f6', '#6366f1', '#a855f7', '#ec4899'];
 
 @Component({
@@ -28,6 +29,9 @@ export class PaletteComponent implements OnInit, AfterViewInit, OnDestroy {
   get sel(): UserSelections { return this.palette.userSelections; }
   get isSpray(): boolean { return this.sel.tool.name === 'Spray'; }
   get isPreset(): boolean { return SWATCHES.includes(this.sel.color); }
+  get isText(): boolean { return this.sel.tool.name === 'Text'; }
+  get isSticker(): boolean { return this.sel.tool.name === 'Sticker'; }
+  hasPreview(tool: Tool): boolean { return !NO_PREVIEW.has(tool.name); }
   /** On-screen size of the brush, roughly as it appears on a full-width board. */
   get dotPx(): number {
     const s = this.isSpray ? this.sel.sprayOptions.radius * 2 : this.sel.tool.name === 'Eraser' ? this.sel.brushSize * 2 : this.sel.brushSize;
@@ -56,9 +60,11 @@ export class PaletteComponent implements OnInit, AfterViewInit, OnDestroy {
   onKey(e: KeyboardEvent): void {
     const t = e.target as HTMLElement | null;
     if (e.defaultPrevented || e.altKey || (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) || document.querySelector('.backdrop')) return;
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); this.board.undo(); return; }
+    const key = e.key.toLowerCase();
+    if ((e.ctrlKey || e.metaKey) && (key === 'y' || (e.shiftKey && key === 'z'))) { e.preventDefault(); this.board.redo(); return; }
+    if ((e.ctrlKey || e.metaKey) && key === 'z') { e.preventDefault(); this.board.undo(); return; }
     if (e.ctrlKey || e.metaKey) return;
-    const n = Number(e.key);
+    const n = e.key === '0' ? 10 : Number(e.key);
     if (n >= 1 && n <= this.palette.tools.length) { this.selectTool(this.palette.tools[n - 1]); return; }
     if (e.key === '[' || e.key === ']') {
       const cur = this.isSpray ? this.sel.sprayOptions.radius : this.sel.brushSize;
@@ -96,7 +102,7 @@ export class PaletteComponent implements OnInit, AfterViewInit, OnDestroy {
   /** Draw a sample stroke of each brush, with the real renderer, in the current color. */
   private drawPreviews(): void {
     if (!this.previews) return;
-    const tools = this.palette.tools.filter((t) => t.name !== 'Eraser');
+    const tools = this.palette.tools.filter((t) => this.hasPreview(t));
     this.previews.forEach((ref, i) => {
       const tool = tools[i];
       const c = ref.nativeElement, g = c.getContext('2d');

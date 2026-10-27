@@ -47,10 +47,13 @@ put the server behind HTTPS (Caddy, nginx, or Tailscale) and set `TRUST_PROXY=1`
 
 * **Draw:** mouse, touch and pen all work. Brushes: pen (smooth ink), pencil, marker, highlighter (see-through),
   crayon, spray paint, line (solid, dashed, dotted), eraser. Pick a color swatch (or any color with the picker) and a size.
-* **Shortcuts:** `1`–`8` pick a tool, `[` / `]` change the size, Ctrl+Z undoes.
+* **Text:** pick Text, click the board and type. Enter places it, Shift+Enter adds a line, Esc cancels. Color and size apply.
+* **Stickers:** pick Sticker, choose one from the grid, click to stamp it. The size slider sets how big.
+  Text and stickers undo, redo, erase, save and export like any stroke.
+* **Shortcuts:** `1`–`9` and `0` pick a tool, `[` / `]` change the size, Ctrl+Z undoes, Ctrl+Y (or Ctrl+Shift+Z) redoes.
 * **Keyboard drawing:** Tab to the board, arrows move the cursor (Shift = big steps, Alt = small), Space or Enter
-  starts and stops drawing, Esc stops.
-* **Undo** removes *your own* last stroke, never somebody else's.
+  starts and stops drawing (or places a text box / sticker), Esc stops.
+* **Undo** removes *your own* last stroke, never somebody else's. **Redo** puts back what you undid (until you draw something new).
 * **Save** stores a named copy. **Boards** lists them (who saved, when) to open or delete.
 * **Erase** clears it for everyone. A backup (`auto before clear …`) is saved first, so an accidental erase
   is one click to undo. Loading a board also backs up the current one. The 10 newest automatic backups are kept.
@@ -84,7 +87,7 @@ but it is visible to anyone with a shell on that Pi.)
 ## Tests
 
 ```bash
-npm run test:server    # 17 tests: auth, rename, .env, lockout, sync, validation, undo, save/erase/load, audit, persistence
+npm run test:server    # 20 tests: auth, rename, .env, lockout, sync, validation, text/stickers, undo/redo, save/erase/load, audit, persistence
 npm run test:e2e       # real Chromium + real server: mouse/touch/pen/keyboard drawing stays identical on every screen
                        # (needs Playwright:  npm i --no-save playwright && npx playwright install chromium)
 npm test               # Angular unit tests
@@ -103,5 +106,5 @@ npm test               # Angular unit tests
 
 ## Not built yet
 
-Redo, text and shape tools, pressure sensitivity, multiple simultaneous boards (there is one live board; saved boards are snapshots),
+Shape tools, moving or editing text after it is placed, pressure sensitivity, multiple simultaneous boards (there is one live board; saved boards are snapshots),
 and an admin role (anyone signed in can erase — but it is backed up and logged).

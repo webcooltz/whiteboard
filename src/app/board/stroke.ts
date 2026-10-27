@@ -1,5 +1,5 @@
 // Framework-free board types. Keep this folder free of Angular imports so it can be tested in plain Node/browsers.
-export type ToolKind = 'pen' | 'pencil' | 'marker' | 'highlighter' | 'crayon' | 'eraser' | 'line' | 'spray';
+export type ToolKind = 'pen' | 'pencil' | 'marker' | 'highlighter' | 'crayon' | 'eraser' | 'line' | 'spray' | 'text' | 'sticker';
 export type Cap = 'round' | 'square' | 'butt';
 
 export interface Stroke {
@@ -14,6 +14,7 @@ export interface Stroke {
   radius: number;
   density: number;
   p: number[]; // flat [x0, y0, x1, y1, ...] in board coordinates (default 1600x900)
+  text?: string; // text boxes (top-left at p) and stickers (centered on p); size is the font size
 }
 
 export const BOARD_W = 1600;
