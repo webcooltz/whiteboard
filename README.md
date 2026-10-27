@@ -1,113 +1,87 @@
 # Whiteboard
 
-A permanent, shared, live whiteboard. A few people (or wall displays such as Raspberry Pis) open the same
-board and draw on it together — with a mouse, touch, a pen, or the keyboard. It is password protected,
-remembers the board across restarts, lets you save and erase boards, and keeps a log of who did what.
+A shared whiteboard that stays on. Open it in a browser, sign in, and everyone sees each other draw in real time.
+Good for a family fridge, a team wall display, or a classroom.
 
-```
- browsers / Raspberry Pi kiosks  ──WebSocket──▶  server/ (Node, no npm dependencies)  ──▶  data/
-        Angular app in src/                      login · live sync · audit log             board.journal
-                                                                                            boards/*.json
-                                                                                            audit.log
-```
+![The board, with notes, stickers and drawings](docs/screenshots/board.png)
+
+## What you can do
+
+- **Draw together, live.** Pen, pencil, marker, highlighter, crayon, spray paint, lines and an eraser, with any color.
+- **Add text and stickers.** Type a text box (with an optional background color), click it again later to edit it, or stamp an emoji sticker.
+- **Undo and redo your own changes.** Never someone else's.
+- **Keep your boards.** Save named copies, open them again, or download the board as a PNG.
+- **Works on any screen.** Mouse, touch, pen or keyboard, on a phone, laptop or wall display.
+- **Safe to leave running.** Password protected, remembers the board after a restart, backs up before erasing,
+  and keeps a log of who did what.
+
+<table>
+  <tr>
+    <td width="68%"><img src="docs/screenshots/editing.png" alt="Editing a text box and choosing its background"></td>
+    <td><img src="docs/screenshots/phone.png" alt="The board on a phone"></td>
+  </tr>
+  <tr>
+    <td align="center">Click a text box to change its text, color, size or background</td>
+    <td align="center">Everything fits on one phone screen</td>
+  </tr>
+</table>
 
 ## Quick start
 
+You need [Node.js](https://nodejs.org) 20 or newer.
+
 ```bash
 npm install
-npm run build                      # builds the Angular app into dist/whiteboard
-cp .env.example .env               # then set BOARD_PASSWORD in .env  (Windows: copy .env.example .env)
-npm run server
-# open http://localhost:8080
+npm run build
+cp .env.example .env     # Windows: copy .env.example .env
 ```
 
-Settings live in `.env` in the project folder (see `.env.example`; real environment variables override it, and
-`ENV_FILE=/path/to/file` points the server at another file). `.env` holds the board password, so it is not committed.
-The server refuses to start with no password configured, so the board is never accidentally open.
+Open `.env` and set `BOARD_PASSWORD` to something long, then:
 
-For development run the server as above and `npm start` (Angular dev server on :4200, proxied to :8080).
+```bash
+npm run server
+```
+
+Visit <http://localhost:8080>, enter a name and the password, and start drawing. Anyone who opens the same address
+(on your network) sees the same board. The server won't start without a password, so it is never left open by accident.
+
+## Using it
+
+| | |
+|---|---|
+| **Tools** | Pick one on the left, or press `1`–`9` and `0`. `[` and `]` change the size. |
+| **Text** | Pick Text and click the board. `Enter` places it, `Shift+Enter` adds a line, `Esc` cancels. Click an existing box to edit it; clear the text to delete it. |
+| **Stickers** | Pick Sticker, choose an emoji, click to stamp it. |
+| **Undo / redo** | `Ctrl+Z` / `Ctrl+Y` (or the top bar). |
+| **Save / Boards** | Save a named copy, then open or delete saved boards from the Boards list. |
+| **Erase** | Clears the board for everyone, after saving an automatic backup you can open from Boards. |
+| **Activity** | Shows who signed in, drew, undid, saved or erased, and when. |
+| **Keyboard only** | `Tab` to the board, arrow keys move the cursor, `Space` draws or places. |
 
 ## Signing in
 
-| Mode | How | Log identities |
-|---|---|---|
-| Shared password | set `BOARD_PASSWORD` (or `BOARD_PASSWORD_HASH`) in `.env` | the name each person types (self-declared) |
-| Per-person passwords | `npm run add-user -- Alice` (creates `data/users.json`) | verified |
-| Wall display / Pi | `BOARD_DEVICE_KEYS=pi-kitchen=<16+ chars>` | `pi-kitchen (device)` |
+By default everyone shares one password and picks their own name. For more control you can instead give each person
+their own password, or give a wall display its own key. See [Signing in and security](docs/signing-in.md).
 
-With the shared password, a browser asks for the password once; after that it stays signed in (30 days) and only
-asks for a name. The Pi kiosk reads the password from its `.env` and signs in by itself, so a Pi only ever shows the
-"your name" box (or nothing at all, if `WHITEBOARD_NAME` is set). Click your name in the top right to change it.
+## Put it on a Raspberry Pi or a server
 
-Passwords are stored as scrypt hashes. Repeated failed sign-ins lock that name and address out for 15 minutes.
-Sessions are signed tokens valid for 30 days; sign-ins use HTTP, so on anything beyond a trusted home network
-put the server behind HTTPS (Caddy, nginx, or Tailscale) and set `TRUST_PROXY=1`.
+The server is plain Node with no extra packages, so it runs happily on a Raspberry Pi. See
+[Running it permanently](docs/deployment.md) for the service setup and for wall displays that open the board by themselves.
 
-## Using the board
-
-* **Draw:** mouse, touch and pen all work. Brushes: pen (smooth ink), pencil, marker, highlighter (see-through),
-  crayon, spray paint, line (solid, dashed, dotted), eraser. Pick a color swatch (or any color with the picker) and a size.
-* **Text:** pick Text, click the board and type. Enter places it, Shift+Enter adds a line, Esc cancels. Color, size and
-  an optional background color apply. With Text picked, click any text box (yours or someone else's) to change its
-  text, color, size or background; the palette restyles it while you type. Clear the text to delete the box.
-* **Stickers:** pick Sticker, choose one from the grid, click to stamp it. The size slider sets how big.
-  Text and stickers undo, redo, erase, save and export like any stroke.
-* **Shortcuts:** `1`–`9` and `0` pick a tool, `[` / `]` change the size, Ctrl+Z undoes, Ctrl+Y (or Ctrl+Shift+Z) redoes.
-* **Keyboard drawing:** Tab to the board, arrows move the cursor (Shift = big steps, Alt = small), Space or Enter
-  starts and stops drawing (or places a text box / sticker), Esc stops.
-* **Undo** takes back *your own* last change (a stroke, or a text box edit), never somebody else's. **Redo** puts back
-  what you undid (until you do something new).
-* **Save** stores a named copy. **Boards** lists them (who saved, when) to open or delete.
-* **Erase** clears it for everyone. A backup (`auto before clear …`) is saved first, so an accidental erase
-  is one click to undo. Loading a board also backs up the current one. The 10 newest automatic backups are kept.
-* **PNG** downloads the board as an image.
-* **Activity** shows the audit log: sign-ins (including failed ones), who drew, undid, saved, loaded, erased, deleted.
-  It is also on disk at `data/audit.log` (one JSON object per line, rotated at 5 MB).
-
-## Running it permanently (e.g. on a Raspberry Pi)
-
-The server needs only Node 20+ — build the Angular app on a laptop and copy it over.
+## For developers
 
 ```bash
-npm run build
-rsync -a dist server package.json  pi@raspberrypi:/opt/whiteboard/     # or any copy method
+npm start                # Angular dev server on :4200 (proxies to the board server on :8080)
+npm run test:server      # server tests: sign-in, sync, validation, text edits, undo/redo, saving, persistence
+npm test                 # Angular unit tests
+npm run test:e2e         # drawing in a real browser against a real server (needs Playwright)
 ```
 
-Then on the Pi: put your settings in `/opt/whiteboard/.env` (copy `.env.example`), create the service user and install
-`deploy/whiteboard.service` (instructions are in its header; `/etc/whiteboard.env` from `deploy/whiteboard.env.example`
-works too, and wins over `.env`). systemd restarts the server after crashes and on boot. The board is
-journalled to disk after every stroke, so a power cut loses at most the stroke in progress.
+- `src/` is the Angular app. `src/app/board/` holds the drawing code, which has no Angular in it.
+- `server/` is the Node server: sign-in, live sync over WebSockets, and saving to `data/`.
+- The board is a list of strokes (a brush stroke, a text box or a sticker). Each change is sent as a small message and every
+  screen redraws it the same way, so all screens match. The board is 1600×900 and scaled to fit.
+- The server checks every message, limits how fast each connection can send, and only accepts connections from its own address.
 
-**Wall displays:** on each display Pi, copy `deploy/pi/kiosk.sh` to `~/whiteboard/` with a `.env` next to it holding
-`WHITEBOARD_URL` (`http://localhost:8080` if the server runs on the same Pi) and `BOARD_PASSWORD`, optionally
-`WHITEBOARD_NAME`. Start it at login (`deploy/pi/whiteboard-kiosk.desktop` is an autostart template). It waits for
-the server, opens Chromium full-screen, signs in by itself and reconnects automatically if the network or server drops.
-Use `READ_ONLY=1` for a screen that only shows the board, or `DEVICE_KEY` (from `BOARD_DEVICE_KEYS`) instead of the
-password for a screen with a fixed name. Touchscreens draw like any other input; the layout is tuned for the 800×480
-Pi touchscreen. (The kiosk passes the password to the browser in the URL hash, which is never sent over the network,
-but it is visible to anyone with a shell on that Pi.)
-
-## Tests
-
-```bash
-npm run test:server    # 21 tests: auth, rename, .env, lockout, sync, validation, text/stickers, text edits, undo/redo, save/erase/load, audit, persistence
-npm run test:e2e       # real Chromium + real server: mouse/touch/pen/keyboard drawing stays identical on every screen
-                       # (needs Playwright:  npm i --no-save playwright && npx playwright install chromium)
-npm test               # Angular unit tests
-```
-
-## How it works
-
-* The board is a list of **strokes**. Drawing sends small `begin` / `points` / `end` messages; everyone replays them,
-  so screens of any size show the same picture (board coordinates are a fixed 1600×900, scaled to fit).
-* Textured brushes (pencil, crayon, spray) are seeded, so they look identical on every screen. Pen, pencil, crayon,
-  spray and eraser paint point by point as they grow; marker, highlighter and lines are drawn as one path (previewed
-  while you draw), so see-through ink doesn't darken where it overlaps itself.
-* The server validates every message, rate-limits each connection, and only accepts WebSocket connections from its
-  own origin.
-* Limits: 100,000 strokes per board, 20 simultaneous connections.
-
-## Not built yet
-
-Shape tools, moving text boxes after they are placed, pressure sensitivity, multiple simultaneous boards (there is one live board; saved boards are snapshots),
-and an admin role (anyone signed in can erase — but it is backed up and logged).
+**Not built yet:** shape tools, moving a text box after placing it, pressure sensitivity, several live boards at once
+(saved boards are snapshots), and an admin role (anyone signed in can erase, but it's backed up and logged).
