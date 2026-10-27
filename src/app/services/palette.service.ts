@@ -19,7 +19,10 @@ export class PaletteService {
         radius: 20,
         density: 40
       },
-      textBg: ''
+      textBg: '',
+      fill: '',
+      label: '',
+      snap: false
     }
   };
 

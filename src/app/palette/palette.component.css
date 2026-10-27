@@ -4,11 +4,11 @@
 }
 h3 { margin: 0 0 .5rem; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 
-.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: .4rem; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: .35rem; }
 .tile {
   min-width: 0; overflow: hidden;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .2rem;
-  height: 58px; padding: .25rem; border: 1px solid var(--border); border-radius: 10px; background: var(--panel-2);
+  height: 52px; padding: .2rem; border: 1px solid var(--border); border-radius: 10px; background: var(--panel-2);
   color: var(--text); font: 500 11px var(--font); cursor: pointer; transition: border-color .12s, background .12s, box-shadow .12s;
 }
 .tile:hover { border-color: #c7cbd3; background: #fff; }
@@ -29,6 +29,19 @@ h3 { margin: 0 0 .5rem; font-size: 11px; font-weight: 600; letter-spacing: .06em
 }
 .stickers button:hover { transform: scale(1.12); }
 .stickers button.on { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 1px var(--accent); }
+
+.chips { display: flex; flex-wrap: wrap; gap: .3rem; }
+.chips button {
+  height: 28px; padding: 0 .7rem; border: 1px solid var(--border); border-radius: 99px; background: var(--panel-2);
+  font: 500 12px var(--font); color: var(--text); cursor: pointer;
+}
+.chips button:hover:not(:disabled) { border-color: #c7cbd3; background: #fff; }
+.chips button:disabled { opacity: .45; cursor: default; }
+.aligns { margin-top: .4rem; }
+.chips button.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.note { margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
+.snap { display: flex; align-items: center; gap: .5rem; font-size: 13px; cursor: pointer; }
+.snap input { accent-color: var(--accent); width: 16px; height: 16px; }
 
 .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(28px, 1fr)); gap: .45rem; }
 .swatch {
@@ -59,6 +72,10 @@ kbd { font: 600 10px var(--font); padding: 1px 5px; border: 1px solid var(--bord
   .tile canvas { height: 18px; }
   .tile i, .tile .emoji { font-size: 15px; height: 18px; line-height: 18px; }
   .seg { margin-top: .3rem; }
+  .chips { gap: .2rem; }
+  .chips button { height: 24px; padding: 0 .55rem; font-size: 11px; }
+  .note { font-size: 11px; line-height: 1.4; }
+  .snap { font-size: 12px; }
   .seg button { height: 26px; }
   .swatches { grid-template-columns: repeat(12, minmax(0, 1fr)); gap: .3rem; }
   .stickers { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: .2rem; }

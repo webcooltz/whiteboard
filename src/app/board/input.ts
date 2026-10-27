@@ -1,4 +1,6 @@
 import type { BoardView } from './board-view';
+import { type ItemPatch, changesBetween, moveGhosts, resizeGhosts } from './items';
+import { SHAPE_DEFAULTS } from './shapes';
 import { newSeed, newStrokeId, type Stroke } from './stroke';
 import type { ToolState } from './tool-state';
 
@@ -18,6 +20,10 @@ const MAX_CHUNK = 1800; // numbers per message; the server accepts 2000
  * Keyboard: Tab (or click) to focus the board, arrow keys move the cursor
  * (Shift = big steps, Alt = tiny steps), Space/Enter starts and stops drawing (or places a text box / sticker),
  * Esc stops, Ctrl+Z undoes, Ctrl+Y / Ctrl+Shift+Z redoes.
+ *
+ * The Select tool picks an item (click, or Space at the keyboard cursor), Shift+click adds or removes one, and dragging
+ * on empty board picks everything inside the rectangle. Dragging a selection moves it, dragging a handle resizes it, the
+ * arrow keys nudge it and Delete removes it. Grouped items are always picked, moved and resized together.
  */
 export class InputController {
   enabled = true;
@@ -26,6 +32,9 @@ export class InputController {
   onTextRequest: ((x: number, y: number) => void) | null = null;
   /** A stroke started (true) or finished (false). */
   onDrawing: ((drawing: boolean) => void) | null = null;
+  /** The Select tool moved or resized items, or removed them. */
+  onItemsChange: ((changes: { id: string; patch: ItemPatch }[]) => void) | null = null;
+  onItemsDrop: ((ids: string[]) => void) | null = null;
   private canvas: HTMLCanvasElement;
   private board: BoardView;
   private getTool: () => ToolState;
@@ -36,6 +45,7 @@ export class InputController {
   private pointerId: number | null = null;
   private lastCursorSent = 0;
   private kb = { x: 0, y: 0, down: false, active: false };
+  private drag: { mode: 'move' | 'resize' | 'marquee'; orig: Stroke[]; handle?: string; ox: number; oy: number } | null = null;
   private pointerFocus = false; // focus() from a pointer press: don't show the keyboard cursor
   private cleanup: Array<() => void> = [];
 
@@ -92,6 +102,12 @@ export class InputController {
     this.canvas.focus({ preventScroll: true });
     this.pointerFocus = false;
     const [x, y] = this.toBoard(e);
+    if (this.getTool().tool === 'select') {
+      if (!this.grab(x, y, e.shiftKey)) return;
+      this.pointerId = e.pointerId;
+      try { this.canvas.setPointerCapture(e.pointerId); } catch { /* not fatal */ }
+      return;
+    }
     if (!this.start(x, y)) return;
     this.pointerId = e.pointerId;
     try { this.canvas.setPointerCapture(e.pointerId); } catch { /* not fatal */ }
@@ -99,6 +115,7 @@ export class InputController {
 
   private onMove(e: PointerEvent): void {
     this.sendCursor(...this.toBoard(e));
+    if (this.drag && e.pointerId === this.pointerId) { this.dragTo(...this.toBoard(e)); return; }
     if (e.pointerId !== this.pointerId || !this.current) return;
     const events = typeof e.getCoalescedEvents === 'function' && e.getCoalescedEvents().length ? e.getCoalescedEvents() : [e];
     for (const ev of events) this.add(...this.toBoard(ev));
@@ -107,6 +124,7 @@ export class InputController {
   private onUp(e: PointerEvent): void {
     if (e.pointerId !== this.pointerId) return;
     this.pointerId = null;
+    this.endDrag(true);
     this.finish();
   }
 
@@ -122,6 +140,18 @@ export class InputController {
       e.preventDefault();
       this.net.send({ t: 'undo' });
       return;
+    }
+    const picked = this.enabled && this.getTool().tool === 'select' ? this.board.selection : [];
+    if (picked.length) {
+      if (k === 'Delete' || k === 'Backspace') { e.preventDefault(); this.onItemsDrop?.(picked.map((s) => s.id)); return; }
+      if (k === 'Escape') { this.board.select(null); return; }
+      const d = arrowDelta(e, this.getTool().snap);
+      if (d) {
+        e.preventDefault();
+        const moved = moveGhosts(this.board.main, picked, d[0], d[1], 0, this.board.w, this.board.h);
+        this.onItemsChange?.(changesBetween(picked, moved));
+        return;
+      }
     }
     if (k === ' ' || k === 'Enter') {
       e.preventDefault();
@@ -154,11 +184,18 @@ export class InputController {
   private start(x: number, y: number): boolean {
     if (!this.enabled || !this.net.online || this.current) return false;
     const t = this.getTool();
+    if (t.tool === 'select') {
+      const hit = this.board.itemAt(x, y);
+      this.board.select(hit ? this.board.withGroups([hit]) : null);
+      return false;
+    }
+    if (t.tool === 'shape' && t.snap) { x = Math.round(x / t.snap) * t.snap; y = Math.round(y / t.snap) * t.snap; }
     if (t.tool === 'text') { this.onTextRequest?.(round(x), round(y)); return false; }
     if (t.tool === 'sticker') { if (t.text) this.place(x, y, t.text, t); return false; }
     const s: Stroke = {
       id: newStrokeId(), user: this.user, tool: t.tool, color: t.color, size: t.size, cap: t.cap,
       dash: t.dash, seed: newSeed(), radius: t.radius, density: t.density, p: [round(x), round(y)],
+      ...(t.tool === 'shape' ? { shape: t.shape, ...(t.fill ? { fill: t.fill } : {}), ...(t.label ? { text: t.label } : {}) } : {}),
     };
     this.current = s;
     this.board.begin(s);
@@ -176,7 +213,7 @@ export class InputController {
 
   // Text and stickers are whole from the start: begin and end in one go.
   private place(x: number, y: number, text: string, t: ToolState): void {
-    if (!this.enabled || !this.net.online) return;
+    if (!this.enabled || !this.net.online || t.tool === 'select') return;
     const s: Stroke = {
       id: newStrokeId(), user: this.user, tool: t.tool, color: t.color, size: t.size, cap: t.cap,
       dash: [], seed: 0, radius: t.radius, density: t.density, p: [round(x), round(y)], text, ...(t.bg ? { bg: t.bg } : {}),
@@ -191,12 +228,14 @@ export class InputController {
   private add(x: number, y: number, force = false): void {
     const s = this.current;
     if (!s) return;
+    const g = s.tool === 'shape' ? this.getTool().snap : 0;
+    if (g) { x = Math.round(x / g) * g; y = Math.round(y / g) * g; }
     x = round(x); y = round(y);
     const n = s.p.length;
     const minDist = s.tool === 'spray' ? 3 : 1.5;
     if (!force && Math.hypot(x - s.p[n - 2], y - s.p[n - 1]) < minDist) return;
     this.board.pts(s.id, [x, y]);
-    if (s.tool === 'line') this.pending = [x, y]; // only the latest end point matters
+    if (s.tool === 'line' || s.tool === 'shape') this.pending = [x, y]; // only the latest end point matters
     else this.pending.push(x, y);
     if (!this.flushTimer) this.flushTimer = setTimeout(() => this.flush(), FLUSH_MS);
   }
@@ -212,13 +251,73 @@ export class InputController {
   }
 
   private finish(): void {
+    this.endDrag(false);
     const s = this.current;
     if (!s) return;
+    if (s.tool === 'shape' && s.shape) {
+      // A click without a drag drops the piece at its usual size.
+      const d = SHAPE_DEFAULTS[s.shape];
+      if (s.p.length < 4 || Math.hypot(s.p[2] - s.p[0], s.p[3] - s.p[1]) < 8) this.add(Math.min(this.board.w, s.p[0] + d.w), Math.min(this.board.h, s.p[1] + d.h), true);
+    }
     this.flush();
     this.current = null;
     this.net.send({ t: 'end', id: s.id });
     this.board.end(s.id);
     this.onDrawing?.(false);
+  }
+
+  // ---- Select tool ----
+  private grab(x: number, y: number, shift: boolean): boolean {
+    if (!this.enabled || !this.net.online) return false;
+    const b = this.board, sel = b.selection;
+    const handle = sel.length ? b.handleAt(x, y) : null;
+    if (handle) { this.drag = { mode: 'resize', orig: [...sel], handle, ox: x, oy: y }; return true; }
+    const hit = b.itemAt(x, y);
+    if (hit) {
+      const members = b.withGroups([hit]);
+      const picked = sel.some((s) => s.id === hit.id);
+      if (shift) { // add to or remove from the selection; no drag
+        const ids = new Set(members.map((s) => s.id));
+        b.select(picked ? sel.filter((s) => !ids.has(s.id)) : b.withGroups([...sel, ...members]));
+        return false;
+      }
+      if (!picked) b.select(members);
+      this.drag = { mode: 'move', orig: [...b.selection], ox: x, oy: y };
+      return true;
+    }
+    // Empty board: drag a rectangle to pick what it touches. A plain click picks nothing.
+    this.drag = { mode: 'marquee', orig: shift ? [...sel] : [], ox: x, oy: y };
+    if (!shift) b.select(null);
+    return true;
+  }
+
+  private dragTo(x: number, y: number): void {
+    const d = this.drag!, b = this.board, g = this.getTool().snap;
+    if (d.mode === 'marquee') {
+      b.setMarquee({ x: Math.min(x, d.ox), y: Math.min(y, d.oy), w: Math.abs(x - d.ox), h: Math.abs(y - d.oy) });
+    } else if (d.mode === 'resize') {
+      b.setGhosts(resizeGhosts(b.main, d.orig, d.handle!, x, y, g, b.w, b.h));
+    } else {
+      b.setGhosts(moveGhosts(b.main, d.orig, x - d.ox, y - d.oy, g, b.w, b.h));
+    }
+  }
+
+  private endDrag(commit: boolean): void {
+    const d = this.drag, b = this.board;
+    if (!d) return;
+    this.drag = null;
+    if (d.mode === 'marquee') {
+      const m = b.marquee;
+      b.setMarquee(null);
+      if (commit && m && (m.w > 3 || m.h > 3)) b.select(b.withGroups([...d.orig, ...b.itemsIn(m)]));
+      return;
+    }
+    const ghosts = b.ghosts;
+    b.setGhosts([]);
+    if (commit && ghosts.length) {
+      const changes = changesBetween(d.orig, ghosts);
+      if (changes.length) this.onItemsChange?.(changes);
+    }
   }
 
   private sendCursor(x: number, y: number): void {
@@ -230,3 +329,9 @@ export class InputController {
 }
 
 const round = (v: number) => Math.round(v * 10) / 10;
+
+/** Arrow-key nudge: one grid square when snapping, else 8 (Shift = 40, Alt = 2). */
+function arrowDelta(e: KeyboardEvent, grid: number): [number, number] | null {
+  const step = grid || (e.shiftKey ? 40 : e.altKey ? 2 : 8);
+  return e.key === 'ArrowLeft' ? [-step, 0] : e.key === 'ArrowRight' ? [step, 0] : e.key === 'ArrowUp' ? [0, -step] : e.key === 'ArrowDown' ? [0, step] : null;
+}

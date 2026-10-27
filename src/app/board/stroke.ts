@@ -1,5 +1,7 @@
 // Framework-free board types. Keep this folder free of Angular imports so it can be tested in plain Node/browsers.
-export type ToolKind = 'pen' | 'pencil' | 'marker' | 'highlighter' | 'crayon' | 'eraser' | 'line' | 'spray' | 'text' | 'sticker';
+export type ToolKind = 'pen' | 'pencil' | 'marker' | 'highlighter' | 'crayon' | 'eraser' | 'line' | 'spray' | 'text' | 'sticker' | 'shape';
+import type { ShapeKind } from './shapes';
+export type { ShapeKind };
 export type Cap = 'round' | 'square' | 'butt';
 
 export interface Stroke {
@@ -16,6 +18,9 @@ export interface Stroke {
   p: number[]; // flat [x0, y0, x1, y1, ...] in board coordinates (default 1600x900)
   text?: string; // text boxes (top-left at p) and stickers (centered on p); size is the font size
   bg?: string; // text box background color (none when missing)
+  shape?: ShapeKind; // which shape or wireframe piece (tool 'shape'); p is two corners, text is its label
+  fill?: string; // shape fill color (none when missing)
+  group?: string; // items with the same group id are selected, moved and resized together
 }
 
 export const BOARD_W = 1600;

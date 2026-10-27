@@ -1,6 +1,6 @@
 // The live board: one shared canvas, many connected clients.
 import { verifyToken } from './auth.mjs';
-import { W, H, MAX_POINTS, cleanBegin, cleanEdit, cleanPoints, cleanSnapshotName } from './validate.mjs';
+import { W, H, MAX_BATCH, MAX_POINTS, MOVABLE, applyUpdate, cleanBegin, cleanEdit, cleanPoints, cleanSnapshotName } from './validate.mjs';
 
 const MAX_STROKES = 100_000;
 const MAX_OPEN_PER_CLIENT = 4;
@@ -16,7 +16,7 @@ export class Hub {
     this.maxClients = maxClients;
     this.clients = new Set();
     // Per identity, most recent last: what they did (undo walks back through it) and what they undid (redo).
-    // Actions: { k: 'add', s } | { k: 'edit', before, after } | { k: 'del', before }
+    // Actions: { k: 'add', s } | { k: 'edit', before, after } | { k: 'del', before } | { k: 'many', list: [action, ...] }
     this.history = new Map();
     this.redo = new Map();
   }
@@ -115,6 +115,9 @@ export class Hub {
       case 'redo': return this.#redo(c);
       case 'rename': return this.#rename(c, m);
       case 'edit': return this.#edit(c, m);
+      case 'update': return this.#update(c, m);
+      case 'drop': return this.#drop(c, m);
+      case 'paste': return this.#paste(c, m);
       case 'clear': return this.#clear(c);
       case 'save': return this.#save(c, m);
       case 'load': return this.#load(c, m);
@@ -144,10 +147,10 @@ export class Hub {
 
   #pts(c, m) {
     const s = c.open.get(m.id);
-    if (!s || s.text !== undefined) return; // text and stickers have no points to add
+    if (!s || s.tool === 'text' || s.tool === 'sticker') return; // placed at one point: nothing to add
     const p = cleanPoints(m.p);
     if (!p) return;
-    if (s.tool === 'line') {
+    if (s.tool === 'line' || s.tool === 'shape') {
       s.p = [s.p[0], s.p[1], p[p.length - 2], p[p.length - 1]]; // a line is just first + latest point
       this.#broadcast({ t: 'pts', id: s.id, p: [p[p.length - 2], p[p.length - 1]] }, c);
       return;
@@ -173,42 +176,60 @@ export class Hub {
     this.redo.delete(c.uid);
   }
 
-  // Undo (back = true) or redo an action. Returns the stroke id it changed, or null if the board has
-  // moved on (someone else changed or removed that stroke since), in which case it is skipped.
-  #apply(c, a, back) {
+  // Undo (back = true) or redo an action, collecting what changed in `out` (sent by #flush). Returns the id of a
+  // stroke it changed, or null if nothing could be applied because the board has moved on (someone else changed
+  // or removed it since), in which case the action is skipped.
+  #apply(c, a, back, out) {
     const st = this.store;
-    const from = back ? a.after : a.before, to = back ? a.before : a.after;
+    if (a.k === 'many') {
+      let first = null;
+      for (const x of back ? [...a.list].reverse() : a.list) {
+        const id = this.#apply(c, x, back, out);
+        first ??= id;
+      }
+      return first;
+    }
     if (a.k === 'add' || a.k === 'del') {
       const s = a.k === 'add' ? a.s : a.before;
-      const removing = (a.k === 'add') === back;
-      if (removing) {
+      if ((a.k === 'add') === back) {
         if (!st.has(s.id)) return null;
         st.remove(s.id);
-        this.#broadcast({ t: 'remove', id: s.id, by: c.user });
+        out.removes.push(s.id);
       } else {
         if (st.has(s.id) || st.strokes.length >= MAX_STROKES) return null;
         st.add(s);
-        this.#broadcast({ t: 'put', s });
+        out.puts.push(s);
       }
       return s.id;
     }
+    const from = back ? a.after : a.before, to = back ? a.before : a.after;
     if (st.get(from.id) !== from) return null;
     st.replace(to);
-    this.#broadcast({ t: 'put', s: to });
+    out.puts.push(to);
     return to.id;
+  }
+
+  // Tell everyone what changed: one message however many items were involved.
+  #flush(c, out) {
+    if (out.removes.length === 1) this.#broadcast({ t: 'remove', id: out.removes[0], by: c.user });
+    else if (out.removes.length) this.#broadcast({ t: 'removes', ids: out.removes, by: c.user });
+    if (out.puts.length === 1) this.#broadcast({ t: 'put', s: out.puts[0] });
+    else if (out.puts.length) this.#broadcast({ t: 'puts', items: out.puts });
   }
 
   #undo(c) {
     const stack = this.history.get(c.uid) ?? [];
+    const out = { puts: [], removes: [] };
     let a, id = null;
-    while (!id && (a = stack.pop())) id = this.#apply(c, a, true);
+    while (!id && (a = stack.pop())) id = this.#apply(c, a, true, out);
     if (!id) {
       // Nothing recorded (e.g. after a server restart): fall back to their newest stroke on the board.
       const s = this.store.lastBy(c.uid, c.user);
       if (!s) return;
       a = { k: 'add', s };
-      id = this.#apply(c, a, true);
+      id = this.#apply(c, a, true, out);
     }
+    this.#flush(c, out);
     const redo = this.redo.get(c.uid) ?? [];
     redo.push(a);
     if (redo.length > MAX_HISTORY) redo.shift();
@@ -218,13 +239,69 @@ export class Hub {
 
   #redo(c) {
     const stack = this.redo.get(c.uid) ?? [];
+    const out = { puts: [], removes: [] };
     let a, id = null;
-    while (!id && (a = stack.pop())) id = this.#apply(c, a, false);
+    while (!id && (a = stack.pop())) id = this.#apply(c, a, false, out);
     if (!id) return;
+    this.#flush(c, out);
     const hist = this.history.get(c.uid) ?? [];
     hist.push(a);
     this.history.set(c.uid, hist);
     this.audit.log('redo', c.user, { id });
+  }
+
+  // Move, resize, restyle or (un)group text boxes, stickers and shapes (see applyUpdate): one item as { id, ... },
+  // or several at once as { items: [{ id, ... }, ...] }. All or nothing, and one undo step.
+  #update(c, m) {
+    const list = Array.isArray(m.items) ? m.items : [m];
+    const bad = () => this.#send(c, { t: 'error', msg: 'Could not change that item' });
+    if (!list.length || list.length > MAX_BATCH) return bad();
+    const changes = [], seen = new Set();
+    for (const u of list) {
+      const before = typeof u?.id === 'string' && !seen.has(u.id) ? this.store.get(u.id) : null;
+      const after = applyUpdate(before, u);
+      if (!after) return bad();
+      seen.add(before.id);
+      if (JSON.stringify(after) !== JSON.stringify(before)) changes.push({ k: 'edit', before, after });
+    }
+    if (!changes.length) return;
+    const out = { puts: [], removes: [] };
+    for (const x of changes) { this.store.replace(x.after); out.puts.push(x.after); }
+    this.#did(c, changes.length === 1 ? changes[0] : { k: 'many', list: changes });
+    this.audit.log('update', c.user, changes.length === 1 ? { id: changes[0].before.id } : { count: changes.length });
+    this.#flush(c, out);
+  }
+
+  // Remove text boxes, stickers and shapes (not drawings): { id } or { ids: [...] }. One undo step.
+  #drop(c, m) {
+    const ids = Array.isArray(m.ids) ? m.ids : [m.id];
+    const found = ids.length && ids.length <= MAX_BATCH ? ids.map((id) => (typeof id === 'string' ? this.store.get(id) : null)) : [];
+    if (!found.length || found.some((s) => !s || !MOVABLE.has(s.tool)) || new Set(ids).size !== ids.length) {
+      return this.#send(c, { t: 'error', msg: 'Could not remove that item' });
+    }
+    const out = { puts: [], removes: [] };
+    for (const s of found) { this.store.remove(s.id); out.removes.push(s.id); }
+    this.#did(c, found.length === 1 ? { k: 'del', before: found[0] } : { k: 'many', list: found.map((before) => ({ k: 'del', before })) });
+    this.audit.log('drop', c.user, found.length === 1 ? { id: found[0].id, tool: found[0].tool } : { count: found.length });
+    this.#flush(c, out);
+  }
+
+  // Paste or duplicate items. They arrive complete with fresh ids; undo removes the whole paste at once.
+  #paste(c, m) {
+    const list = Array.isArray(m.items) ? m.items : [];
+    const bad = () => this.#send(c, { t: 'error', msg: 'Could not paste that' });
+    if (!list.length || list.length > MAX_BATCH || this.store.strokes.length + list.length > MAX_STROKES) return bad();
+    const items = [], seen = new Set();
+    for (const raw of list) {
+      const h = cleanBegin(raw, true);
+      if (!h || !MOVABLE.has(h.tool) || seen.has(h.id) || this.store.has(h.id)) return bad();
+      seen.add(h.id);
+      items.push({ ...h, user: c.user, uid: c.uid });
+    }
+    for (const s of items) this.store.add(s);
+    this.#did(c, items.length === 1 ? { k: 'add', s: items[0] } : { k: 'many', list: items.map((s) => ({ k: 'add', s })) });
+    this.audit.log('paste', c.user, { count: items.length });
+    this.#flush(c, { puts: items, removes: [] });
   }
 
   // Anyone can change a text box: its text (empty text deletes it), color, size and background.

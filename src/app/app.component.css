@@ -11,7 +11,7 @@
 /* Phones held upright: tools under the board. */
 @media (max-width: 800px) and (orientation: portrait) {
   .page { grid-template: "top" 52px "board" 1fr "side" auto / 100%; }
-  .side { max-height: 55dvh; }
+  .side { max-height: 60dvh; }
   /* The bar slides out of the way while a stroke is being drawn (no reflow, so the board does not move under the finger). */
   .top { position: relative; z-index: 5; transition: transform .18s ease, opacity .18s ease; }
   .page.drawing .top { transform: translateY(-100%); opacity: 0; pointer-events: none; }

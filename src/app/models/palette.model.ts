@@ -72,6 +72,25 @@ export class Palette {
       {name: '💯', description: '💯', icon: ''},
       {name: '👋', description: '👋', icon: ''}
     ]),
+    new Tool('Select', 'Move, resize and restyle', 'fas fa-arrow-pointer', 'select', [
+      {name: 'select', description: 'Select', icon: 'fas fa-arrow-pointer'}
+    ]),
+    new Tool('Shape', 'Rectangles, ellipses, arrows', 'fas fa-shapes', 'shape', [
+      {name: 'rect', description: 'Rectangle', icon: ''},
+      {name: 'round', description: 'Rounded', icon: ''},
+      {name: 'ellipse', description: 'Ellipse', icon: ''},
+      {name: 'diamond', description: 'Diamond', icon: ''},
+      {name: 'arrow', description: 'Arrow', icon: ''}
+    ]),
+    new Tool('UI Kit', 'Wireframe pieces', 'fas fa-table-cells-large', 'kit', [
+      {name: 'button', description: 'Button', icon: ''},
+      {name: 'input', description: 'Input', icon: ''},
+      {name: 'checkbox', description: 'Checkbox', icon: ''},
+      {name: 'toggle', description: 'Toggle', icon: ''},
+      {name: 'image', description: 'Image', icon: ''},
+      {name: 'phone', description: 'Phone', icon: ''},
+      {name: 'browser', description: 'Browser', icon: ''}
+    ]),
   ];
 
   // usage:

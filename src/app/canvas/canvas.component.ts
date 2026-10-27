@@ -6,7 +6,8 @@ import { PaletteService } from '../services/palette.service';
 import { BoardView } from '../board/board-view';
 import { InputController } from '../board/input';
 import { BOARD_H, BOARD_W } from '../board/stroke';
-import { textSlider, toolStateFrom } from '../board/tool-state';
+import { GRID, shapeSlider, shapeWidth, stickerSize, stickerSlider, textSize, textSlider, toolStateFrom } from '../board/tool-state';
+import { type ItemPatch } from '../board/items';
 import { LINE_HEIGHT, textPad } from '../board/renderer';
 import type { Stroke } from '../board/stroke';
 
@@ -28,6 +29,8 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
   /** The text box being typed, in board coordinates (null when not typing). */
   editor: TextEditor | null = null;
   editorText = '';
+  /** Snap-to-grid is on and a tool that uses it is picked: show the grid. */
+  snapOn = false;
   readonly lineHeight = LINE_HEIGHT;
   private scale = 1; // screen pixels per board pixel
 
@@ -55,8 +58,15 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
     );
     this.board.attachView(view);
     this.view = view;
-    // Switching away from the Text tool finishes the box being typed.
-    this.paletteSub = this.palette.paletteChanged.subscribe((p) => { if (this.editor && p.userSelections.tool.name !== 'Text') this.commitText(); });
+    view.onSelect = (s) => this.zone.run(() => this.onSelected(s));
+    this.paletteSub = this.palette.paletteChanged.subscribe((p) => {
+      const name = p.userSelections.tool.name;
+      // Switching away from the Text tool finishes the box being typed.
+      if (this.editor && name !== 'Text') this.commitText();
+      this.snapOn = !!p.userSelections.snap && ['Shape', 'UI Kit', 'Select'].includes(name);
+      if (name !== 'Select') view.select(null);
+      else this.restyleSelected();
+    });
 
     // Pointer/keyboard handlers fire constantly; keep them out of Angular's change detection.
     this.zone.runOutsideAngular(() => {
@@ -69,6 +79,8 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
       this.input.user = this.auth.user;
       this.input.onTextRequest = (x, y) => this.zone.run(() => this.openEditor(x, y));
       // The page hides its top bar on phones while this is set (see app.component.css).
+      this.input.onItemsChange = (changes) => this.board.updateItems(changes);
+      this.input.onItemsDrop = (ids) => this.board.dropItems(ids);
       this.input.onDrawing = (on) => canvas.closest('.page')?.classList.toggle('drawing', on);
       this.tokenSub = merge(this.auth.tokenChanged, this.auth.renamed).subscribe(() => { if (this.input) this.input.user = this.auth.user; });
       this.input.enabled = !this.auth.readOnly;
@@ -83,6 +95,8 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
         const h = stage.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
         const scale = Math.min(w / BOARD_W, h / BOARD_H);
         this.scale = Math.floor(BOARD_W * scale) / BOARD_W;
+        view.scale = this.scale;
+        frame.style.setProperty('--cell', `${GRID * this.scale}px`);
         frame.style.width = `${Math.floor(BOARD_W * scale)}px`;
         frame.style.height = `${Math.floor(BOARD_H * scale)}px`;
       };
@@ -166,6 +180,50 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
     if (text === o.text && color === o.color && size === o.size && (bg ?? null) === (o.bg ?? null)) return;
     const { bg: _old, ...rest } = o;
     this.board.editText({ ...rest, text, color, size, ...(bg ? { bg } : {}) });
+  }
+
+  // ---- Select tool: the palette shows, and changes, whatever is picked ----
+  /** What the palette said when the selection was loaded into it: later differences are the person's changes. */
+  private loaded = { color: '', size: 0, fill: '', bg: '', label: '' };
+
+  private onSelected(items: Stroke[]): void {
+    if (!items.length) return;
+    const sel = this.palette.getPalette().userSelections;
+    const one = items.length === 1 ? items[0] : null;
+    const first = items.find((s) => s.tool !== 'sticker');
+    if (first) sel.color = first.color;
+    if (one) sel.brushSize = one.tool === 'text' ? textSlider(one.size) : one.tool === 'sticker' ? stickerSlider(one.size) : shapeSlider(one.size);
+    sel.textBg = items.find((s) => s.tool === 'text')?.bg ?? '';
+    sel.fill = items.find((s) => s.tool === 'shape')?.fill ?? '';
+    sel.label = one?.tool === 'shape' ? one.text ?? '' : '';
+    this.loaded = { color: sel.color, size: sel.brushSize, fill: sel.fill, bg: sel.textBg, label: sel.label };
+    this.palette.setPalette(this.palette.getPalette());
+  }
+
+  /** The palette was changed while items are picked: apply whatever the person changed to all of them. */
+  private restyleSelected(): void {
+    const items = this.view?.selection ?? [];
+    const sel = this.palette.getPalette().userSelections;
+    if (!items.length || sel.tool.name !== 'Select') return;
+    const was = this.loaded;
+    const now = { color: sel.color, size: sel.brushSize, fill: sel.fill || '', bg: sel.textBg || '', label: sel.label?.trim() || '' };
+    const one = items.length === 1;
+    const colorChanged = now.color !== was.color, sizeChanged = one && now.size !== was.size;
+    const fillChanged = now.fill !== was.fill, bgChanged = now.bg !== was.bg, labelChanged = one && now.label !== was.label;
+    if (!colorChanged && !sizeChanged && !fillChanged && !bgChanged && !labelChanged) return;
+    this.loaded = now;
+    const changes = items.flatMap((s) => {
+      const patch: ItemPatch = {};
+      if (colorChanged && s.tool !== 'sticker') patch.color = now.color;
+      if (sizeChanged) patch.size = s.tool === 'text' ? textSize(now.size) : s.tool === 'sticker' ? stickerSize(now.size) : shapeWidth(now.size);
+      if (s.tool === 'shape') {
+        if (fillChanged) patch.fill = now.fill || null;
+        if (labelChanged && s.shape !== 'arrow') patch.text = now.label || null;
+      }
+      if (s.tool === 'text' && bgChanged) patch.bg = now.bg || null;
+      return Object.keys(patch).length ? [{ id: s.id, patch }] : [];
+    });
+    this.board.updateItems(changes);
   }
 
   private cancelText(): void {

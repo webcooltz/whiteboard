@@ -3,7 +3,7 @@
   <div class="tiles" role="radiogroup" aria-label="Tool">
     <button *ngFor="let tool of palette.tools; let i = index" type="button" class="tile" role="radio"
       [class.on]="tool === sel.tool" [attr.aria-checked]="tool === sel.tool" (click)="selectTool(tool)"
-      [title]="tool.description + (i < 10 ? ' (' + (i + 1) % 10 + ')' : '')">
+      [title]="tool.description + (hotkey(tool, i) ? ' (' + hotkey(tool, i) + ')' : '')">
       <canvas #preview *ngIf="hasPreview(tool); else icon" width="112" height="48" aria-hidden="true"></canvas>
       <ng-template #icon>
         <b class="emoji" *ngIf="tool.name === 'Sticker'; else fa" aria-hidden="true">{{ tool.selectedOption.name }}</b>
@@ -12,13 +12,41 @@
       <span>{{ tool.name }}</span>
     </button>
   </div>
-  <div class="seg" *ngIf="sel.tool.options.length > 1 && !isSticker" role="radiogroup" aria-label="Line style">
+  <div class="seg" *ngIf="sel.tool.options.length > 1 && !isStickerTool && !isChips" role="radiogroup" aria-label="Line style">
     <button *ngFor="let o of sel.tool.options" type="button" role="radio" [class.on]="o === sel.tool.selectedOption"
       [attr.aria-checked]="o === sel.tool.selectedOption" (click)="selectToolOption(o)">{{ o.description }}</button>
   </div>
 </section>
 
-<section *ngIf="isSticker">
+<section *ngIf="isChips">
+  <h3>{{ sel.tool.name === 'UI Kit' ? 'Piece' : 'Shape' }}</h3>
+  <div class="chips" role="radiogroup" [attr.aria-label]="sel.tool.name">
+    <button *ngFor="let o of sel.tool.options" type="button" role="radio" [class.on]="o === sel.tool.selectedOption"
+      [attr.aria-checked]="o === sel.tool.selectedOption" (click)="selectToolOption(o)">{{ o.description }}</button>
+  </div>
+</section>
+
+<section *ngIf="isSelectTool && !board.selection.length">
+  <p class="note">Click a note, sticker or shape to pick it, <kbd>Shift</kbd>+click to add more, or drag a box round several.
+    Drag to move, drag a dot to resize. <kbd>Ctrl</kbd>+<kbd>G</kbd> groups, <kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>V</kbd> copy and paste, <kbd>Delete</kbd> removes.</p>
+</section>
+
+<section *ngIf="showSelection">
+  <h3>{{ board.selection.length }} picked</h3>
+  <div class="chips">
+    <button type="button" *ngIf="board.canGroup" (click)="board.groupSelection()" title="Group (Ctrl+G)">Group</button>
+    <button type="button" *ngIf="board.hasGroup" (click)="board.ungroupSelection()" title="Ungroup (Ctrl+Shift+G)">Ungroup</button>
+    <button type="button" (click)="board.copySelection()" title="Copy (Ctrl+C)">Copy</button>
+    <button type="button" (click)="pasteNow()" [disabled]="!board.hasClipboard()" title="Paste (Ctrl+V)">Paste</button>
+    <button type="button" (click)="board.duplicateSelection()" title="Duplicate (Ctrl+D)">Duplicate</button>
+    <button type="button" (click)="board.deleteSelection()" title="Delete (Del)">Delete</button>
+  </div>
+  <div class="chips aligns" *ngIf="board.canGroup" role="group" aria-label="Align">
+    <button *ngFor="let a of aligns" type="button" (click)="board.align(a[0])" [title]="'Align ' + a[1].toLowerCase()">{{ a[1] }}</button>
+  </div>
+</section>
+
+<section *ngIf="isStickerTool">
   <h3>Stickers</h3>
   <div class="stickers" role="radiogroup" aria-label="Sticker">
     <button *ngFor="let o of sel.tool.options" type="button" role="radio" [class.on]="o === sel.tool.selectedOption"
@@ -26,7 +54,7 @@
   </div>
 </section>
 
-<section *ngIf="sel.tool.name !== 'Eraser' && !isSticker">
+<section *ngIf="showColor">
   <h3>Color</h3>
   <div class="swatches" role="radiogroup" aria-label="Color">
     <button *ngFor="let c of swatches" type="button" class="swatch" role="radio" [style.background]="c" [class.light]="c === '#ffffff'"
@@ -38,22 +66,28 @@
   </div>
 </section>
 
-<section *ngIf="isText">
-  <h3>Background</h3>
-  <div class="swatches" role="radiogroup" aria-label="Text background">
-    <button type="button" class="swatch none" role="radio" [class.on]="!sel.textBg" [attr.aria-checked]="!sel.textBg"
-      aria-label="No background" title="No background" (click)="setTextBg('')"></button>
+<section *ngIf="showFill">
+  <h3>{{ isText ? 'Background' : 'Fill' }}</h3>
+  <div class="swatches" role="radiogroup" [attr.aria-label]="isText ? 'Text background' : 'Fill'">
+    <button type="button" class="swatch none" role="radio" [class.on]="!fillValue" [attr.aria-checked]="!fillValue"
+      aria-label="None" title="None" (click)="setFill('')"></button>
     <button *ngFor="let c of textBgs" type="button" class="swatch" role="radio" [style.background]="c" [class.light]="c === '#ffffff'"
-      [class.on]="c === sel.textBg" [attr.aria-checked]="c === sel.textBg" [attr.aria-label]="c" (click)="setTextBg(c)"></button>
+      [class.on]="c === fillValue" [attr.aria-checked]="c === fillValue" [attr.aria-label]="c" (click)="setFill(c)"></button>
   </div>
 </section>
 
-<section>
-  <h3>{{ isSpray ? 'Spray width' : isText ? 'Text size' : isSticker ? 'Sticker size' : 'Size' }}</h3>
+<section *ngIf="showLabel">
+  <h3>Label</h3>
+  <input class="input" type="text" maxlength="60" [value]="sel.label || ''" placeholder="Default text" aria-label="Label"
+    (change)="setLabel($any($event.target).value)">
+</section>
+
+<section *ngIf="kind !== 'none' && kind !== 'multi'">
+  <h3>{{ isSpray ? 'Spray width' : isText ? 'Text size' : isSticker ? 'Sticker size' : kind === 'shape' ? 'Outline' : 'Size' }}</h3>
   <div class="size">
     <span class="dotbox" *ngIf="isText || isSticker; else dot" [style.color]="isText ? sel.color : null"
       [style.background]="isText && sel.textBg ? sel.textBg : null"
-      [style.font-size.px]="isText ? 10 + sel.brushSize * 0.6 : 14 + sel.brushSize * 0.6">{{ isText ? 'Aa' : sel.tool.selectedOption.name }}</span>
+      [style.font-size.px]="isText ? 10 + sel.brushSize * 0.6 : 14 + sel.brushSize * 0.6">{{ isText ? 'Aa' : stickerGlyph }}</span>
     <ng-template #dot><span class="dotbox"><span class="sizedot" [style.width.px]="dotPx" [style.height.px]="dotPx"
       [style.background]="sel.tool.name === 'Eraser' ? '#d1d5db' : sel.color"></span></span></ng-template>
     <input type="range" min="1" [max]="isSpray ? 60 : 40" [ngModel]="isSpray ? sel.sprayOptions.radius : sel.brushSize"
@@ -67,4 +101,8 @@
   </div>
 </section>
 
-<p class="keys"><kbd>1</kbd>–<kbd>0</kbd> tools &nbsp;<kbd>[</kbd> <kbd>]</kbd> size<br><kbd>Ctrl</kbd>+<kbd>Z</kbd> undo &nbsp;<kbd>Ctrl</kbd>+<kbd>Y</kbd> redo</p>
+<label class="snap" *ngIf="showSnap">
+  <input type="checkbox" [ngModel]="sel.snap" (ngModelChange)="setSnap($event)"> Snap to grid
+</label>
+
+<p class="keys"><kbd>1</kbd>–<kbd>0</kbd> tools &nbsp;<kbd>V</kbd> select &nbsp;<kbd>[</kbd> <kbd>]</kbd> size<br><kbd>Ctrl</kbd>+<kbd>Z</kbd> undo &nbsp;<kbd>Ctrl</kbd>+<kbd>Y</kbd> redo<br><kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>V</kbd> copy, paste</p>

@@ -226,6 +226,121 @@ test('anyone can edit a text box; undo and redo step through edits; empty text d
   ann.close(); bob.close();
 });
 
+test('shapes and wireframe pieces: drag out, move, restyle, remove, and undo each step', async () => {
+  const ann = await connect('Ann');
+  const bob = await connect('Bob');
+  ann.send(stroke('shape0001', { tool: 'shape', shape: 'button', fill: '#3b82f6', text: 'Sign in', size: 3, p: [100, 100] }));
+  await bob.wait((m) => m.t === 'begin' && m.id === 'shape0001');
+  ann.send({ t: 'pts', id: 'shape0001', p: [150, 150] });
+  ann.send({ t: 'pts', id: 'shape0001', p: [300, 160] }); // only the latest corner counts
+  ann.send({ t: 'end', id: 'shape0001' });
+  await bob.wait((m) => m.t === 'end' && m.id === 'shape0001');
+  const made = app.store.get('shape0001');
+  assert.deepEqual([made.p, made.shape, made.fill, made.text], [[100, 100, 300, 160], 'button', '#3b82f6', 'Sign in']);
+
+  const bad = [
+    stroke('badshape1', { tool: 'shape', p: [1, 1] }), stroke('badshape2', { tool: 'shape', shape: 'rm-rf', p: [1, 1] }),
+    stroke('badshape3', { tool: 'shape', shape: 'rect', fill: 'red', p: [1, 1] }), stroke('badshape4', { tool: 'shape', shape: 'rect', p: [1, 1, 2, 2] }),
+    stroke('badshape5', { tool: 'shape', shape: 'rect', text: 'two\nlines', p: [1, 1] }),
+  ];
+  for (const b of bad) ann.send(b);
+  await sleep(150);
+  assert.equal(bob.msgs.filter((m) => m.t === 'begin' && m.id.startsWith('badshape')).length, 0);
+
+  bob.send({ t: 'update', id: 'shape0001', p: [120, 130, 320, 190] }); // anyone can move it
+  assert.deepEqual((await ann.wait((m) => m.t === 'put' && m.s.p[0] === 120)).s.p, [120, 130, 320, 190]);
+  bob.send({ t: 'update', id: 'shape0001', color: '#ef4444', size: 6, fill: null, text: 'Go' });
+  const re = (await ann.wait((m) => m.t === 'put' && m.s.text === 'Go')).s;
+  assert.deepEqual([re.color, re.size, re.fill], ['#ef4444', 6, undefined]);
+
+  for (const badUpdate of [{ p: [1, 2] }, { p: [1, 2, 3, 99999] }, { color: 'red' }, { size: 0 }, { bg: '#000000' }, { fill: 'x' }, { text: 'a\nb' }]) {
+    bob.send({ t: 'update', id: 'shape0001', ...badUpdate });
+  }
+  bob.send({ t: 'update', id: 'nosuchshape', p: [1, 1, 2, 2] });
+  await sleep(150);
+  assert.equal(bob.msgs.filter((m) => m.t === 'error').length, 8);
+  assert.equal(app.store.get('shape0001').text, 'Go');
+
+  bob.send({ t: 'undo' }); // undoes the restyle, then the move
+  await ann.wait((m) => m.t === 'put' && m.s.text === 'Sign in' && m.s.p[0] === 120);
+  bob.send({ t: 'undo' });
+  await ann.wait((m) => m.t === 'put' && m.s.p[0] === 100);
+
+  bob.send({ t: 'drop', id: 'shape0001' });
+  await ann.wait((m) => m.t === 'remove' && m.id === 'shape0001');
+  bob.send({ t: 'undo' });
+  await ann.wait((m) => m.t === 'put' && m.s.id === 'shape0001');
+  ann.send(stroke('penstroke1')); ann.send({ t: 'end', id: 'penstroke1' });
+  await bob.wait((m) => m.t === 'end' && m.id === 'penstroke1');
+  bob.send({ t: 'drop', id: 'penstroke1' }); // drawings are removed by undo or the eraser, not dropped
+  await bob.wait((m) => m.t === 'error' && /remove/.test(m.msg));
+  assert.ok(app.store.has('penstroke1'));
+  ann.close(); bob.close();
+});
+
+test('paste, group, move many at once, and delete many: each is one undo step', async () => {
+  const ann = await connect('Ann');
+  const bob = await connect('Bob');
+  const base = { color: '#000000', size: 3, cap: 'round', dash: [], seed: 0 };
+  const items = [
+    { ...base, id: 'multi0001', tool: 'shape', shape: 'rect', p: [10, 10, 60, 60], group: 'groupone01' },
+    { ...base, id: 'multi0002', tool: 'text', size: 30, p: [100, 100], text: 'Hi', group: 'groupone01' },
+    { ...base, id: 'multi0003', tool: 'sticker', size: 60, p: [200, 200], text: '🎉' },
+  ];
+  ann.send({ t: 'paste', items });
+  const pasted = (await bob.wait((m) => m.t === 'puts' && m.items.length === 3)).items;
+  assert.deepEqual(pasted.map((s) => [s.id, s.user, s.group]), [['multi0001', 'Ann', 'groupone01'], ['multi0002', 'Ann', 'groupone01'], ['multi0003', 'Ann', undefined]]);
+
+  const before = app.store.strokes.length;
+  const badPastes = [
+    [{ ...items[0], id: 'multi0009', p: [1, 1] }], // a shape needs both corners
+    [{ ...items[0], id: 'multi0001' }], // id already on the board
+    [{ ...items[0], id: 'multi0010' }, { ...items[1], id: 'multi0010' }], // same id twice
+    [{ ...base, id: 'multi0011', tool: 'pen', p: [1, 1] }], // drawings are not pasted
+    [{ ...items[0], id: 'multi0012', group: 'no' }], // bad group id
+    Array.from({ length: 201 }, (_, i) => ({ ...items[2], id: `many${String(i).padStart(5, '0')}` })),
+    [],
+  ];
+  for (const b of badPastes) ann.send({ t: 'paste', items: b });
+  await sleep(200);
+  assert.equal(app.store.strokes.length, before, 'bad pastes add nothing');
+  assert.equal(ann.msgs.filter((m) => m.t === 'error').length, badPastes.length);
+
+  // Move two items in one message: Bob sees one 'puts', and one undo of Bob's puts both back.
+  bob.send({ t: 'update', items: [{ id: 'multi0001', p: [20, 20, 70, 70] }, { id: 'multi0003', p: [210, 210] }] });
+  const moved = (await ann.wait((m) => m.t === 'puts' && m.items[0].p[0] === 20)).items;
+  assert.deepEqual(moved.map((s) => s.p), [[20, 20, 70, 70], [210, 210]]);
+  bob.send({ t: 'update', items: [{ id: 'multi0001', group: null }, { id: 'multi0002', group: null }] }); // ungroup
+  await ann.wait((m) => m.t === 'puts' && m.items.every((s) => s.group === undefined));
+  bob.send({ t: 'update', items: [{ id: 'multi0001', p: [30, 30, 80, 80] }, { id: 'nosuchitem', p: [1, 1] }] }); // all or nothing
+  await bob.wait((m) => m.t === 'error' && /change/.test(m.msg));
+  assert.deepEqual(app.store.get('multi0001').p, [20, 20, 70, 70]);
+  bob.send({ t: 'update', items: [{ id: 'multi0001', group: 'newgroup01' }, { id: 'multi0002', group: 'newgroup01' }] }); // regroup
+  await ann.wait((m) => m.t === 'puts' && m.items.every((s) => s.group === 'newgroup01'));
+
+  bob.send({ t: 'undo' }); // undoes the regroup
+  await ann.wait((m) => m.t === 'puts' && m.items.every((s) => s.group === undefined));
+  bob.send({ t: 'undo' }); // undoes the ungroup
+  await ann.wait((m) => m.t === 'puts' && m.items.every((s) => s.group === 'groupone01'));
+  bob.send({ t: 'undo' }); // undoes the move of two items
+  await ann.wait((m) => m.t === 'puts' && m.items[0].p[0] === 10);
+
+  bob.send({ t: 'drop', ids: ['multi0001', 'multi0002'] });
+  assert.deepEqual((await ann.wait((m) => m.t === 'removes')).ids, ['multi0001', 'multi0002']);
+  bob.send({ t: 'undo' });
+  await ann.wait((m) => m.t === 'puts' && m.items.length === 2 && m.items[0].id === 'multi0001');
+  bob.send({ t: 'drop', ids: ['multi0001', 'penstroke9'] });
+  await bob.wait((m) => m.t === 'error' && /remove/.test(m.msg));
+  assert.ok(app.store.has('multi0001'));
+
+  ann.send({ t: 'undo' }); // undoes the whole paste, in one step
+  assert.equal((await bob.wait((m) => m.t === 'removes' && m.ids.length === 3)).ids.length, 3);
+  assert.ok(!app.store.has('multi0001') && !app.store.has('multi0003'));
+  ann.send({ t: 'redo' });
+  await bob.wait((m) => m.t === 'puts' && m.items.length === 3);
+  ann.close(); bob.close();
+});
+
 test('undo removes only your own last stroke', async () => {
   const ann = await connect('Ann');
   const bob = await connect('Bob');

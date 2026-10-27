@@ -105,6 +105,9 @@ export class BoardMenuComponent {
         if (e['tool'] === 'text') return 'added a text box';
         if (e['tool'] === 'sticker') return 'placed a sticker';
         return `drew with the ${s('tool')} (${s('points')} points)`;
+      case 'update': return 'changed a shape or note';
+      case 'drop': return 'removed an item';
+      case 'paste': return 'pasted items';
       case 'edit': return e['deleted'] ? 'deleted a text box' : 'edited a text box';
       case 'undo': return 'undid their last change';
       case 'redo': return 'redid something they undid';

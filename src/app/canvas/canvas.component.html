@@ -1,6 +1,6 @@
 <div class="wrap">
   <div class="stage" #stage>
-    <div class="frame" #frame>
+    <div class="frame" #frame [class.grid]="snapOn">
       <canvas #whiteboard class="layer board" width="1600" height="900" tabindex="0"
         role="application"
         aria-label="Shared whiteboard. Arrow keys move the cursor, Space starts and stops drawing or places text and stickers, Escape stops, Control+Z undoes, Control+Y redoes."></canvas>

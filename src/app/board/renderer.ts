@@ -1,4 +1,5 @@
 import type { Stroke } from './stroke';
+import { drawShape } from './shapes';
 
 // Small deterministic PRNG so textured brushes look identical on every screen.
 function mulberry32(a: number): () => number {
@@ -25,8 +26,11 @@ function paperHole(x: number, y: number): boolean {
  * Every other brush is painted point by point as it grows.
  */
 export function isWhole(s: Stroke): boolean {
-  return s.tool === 'line' || s.tool === 'marker' || s.tool === 'highlighter' || s.text !== undefined;
+  return s.tool === 'line' || s.tool === 'marker' || s.tool === 'highlighter' || s.tool === 'shape' || isTextual(s);
 }
+
+/** Text boxes and stickers: placed at one point, with no path to extend. */
+export const isTextual = (s: Stroke) => s.tool === 'text' || s.tool === 'sticker';
 
 export const TEXT_FONT = "500 {size}px 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif";
 export const STICKER_FONT = "{size}px 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif";
@@ -106,7 +110,8 @@ export function paintTail(ctx: CanvasRenderingContext2D, s: Stroke): void {
 export function drawWhole(ctx: CanvasRenderingContext2D, s: Stroke): void {
   const n = s.p.length / 2;
   if (n === 0) return;
-  if (s.text !== undefined) { drawText(ctx, s); return; }
+  if (isTextual(s)) { drawText(ctx, s); return; }
+  if (s.tool === 'shape') { drawShape(ctx, s); return; }
   const p = s.p;
   ctx.save();
   setup(ctx, s);

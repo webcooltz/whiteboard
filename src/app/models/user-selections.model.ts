@@ -9,6 +9,9 @@ export class UserSelections {
   public brushShape: string;
   public sprayOptions: SprayOptions;
   public textBg?: string; // text box background; '' or missing = none
+  public fill?: string; // shape fill; '' or missing = none
+  public label?: string; // text for the next wireframe piece (empty = its default)
+  public snap?: boolean; // snap shapes and moves to the grid
 
   constructor(tool: Tool, color: string, secondaryColor: string, brushSize: number, brushShape: string, sprayOptions: SprayOptions) {
     this.tool = tool;
